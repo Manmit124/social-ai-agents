@@ -1,5 +1,6 @@
 import os
-import google.generativeai as genai
+import asyncio
+from google import genai
 from typing import List
 from prompts.templates import TWEET_GENERATION_PROMPT, HASHTAG_GENERATION_PROMPT
 
@@ -11,8 +12,10 @@ class GeminiService:
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY not found in environment variables")
         
-        genai.configure(api_key=self.api_key)
-        self.model = genai.GenerativeModel('gemini-pro')
+        # Initialize the new Gemini client
+        os.environ["GEMINI_API_KEY"] = self.api_key
+        self.client = genai.Client()
+        self.model_name = "gemini-2.0-flash-exp"
     
     async def generate_tweet(self, user_prompt: str) -> str:
         """
@@ -26,7 +29,15 @@ class GeminiService:
         """
         try:
             prompt = TWEET_GENERATION_PROMPT.format(user_prompt=user_prompt)
-            response = self.model.generate_content(prompt)
+            # Run sync operation in thread pool
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=prompt
+                )
+            )
             
             # Extract text from response
             tweet_content = response.text.strip()
@@ -53,7 +64,15 @@ class GeminiService:
         """
         try:
             prompt = HASHTAG_GENERATION_PROMPT.format(tweet_content=tweet_content)
-            response = self.model.generate_content(prompt)
+            # Run sync operation in thread pool
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=prompt
+                )
+            )
             
             # Extract hashtags from response
             hashtags_text = response.text.strip()

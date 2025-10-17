@@ -17,7 +17,7 @@ def create_agent_graph():
     workflow.add_node("plan", plan_node)
     workflow.add_node("generate", generate_node)
     workflow.add_node("validate", validate_node)
-    workflow.add_node("hashtags", hashtag_node)
+    workflow.add_node("add_hashtags", hashtag_node)
     workflow.add_node("finalize", finalize_node)
     
     # Define the edges (flow)
@@ -32,15 +32,15 @@ def create_agent_graph():
     # Validate -> Hashtags (if valid) or END (if invalid)
     workflow.add_conditional_edges(
         "validate",
-        lambda state: "hashtags" if state.get("is_valid") else "end",
+        lambda state: "add_hashtags" if state.get("is_valid") else "end",
         {
-            "hashtags": "hashtags",
+            "add_hashtags": "add_hashtags",
             "end": END
         }
     )
     
     # Hashtags -> Finalize
-    workflow.add_edge("hashtags", "finalize")
+    workflow.add_edge("add_hashtags", "finalize")
     
     # Finalize -> END
     workflow.add_edge("finalize", END)
