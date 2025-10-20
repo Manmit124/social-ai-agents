@@ -19,21 +19,23 @@ Build a multi-user, multi-platform social media AI agent that generates platform
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    FRONTEND (Next.js)                        │
-│  • User Authentication (Supabase Auth)                       │
-│  • Social Account Connection (OAuth Flow)                    │
+│  • Supabase Auth (Client-side)                               │
+│  • React Query State Management                              │
+│  • Next.js Middleware (Route Protection)                     │
 │  • Content Generation UI                                     │
 │  • Platform Selection & Preview                              │
 └─────────────────────────────────────────────────────────────┘
                           ↓
 ┌─────────────────────────────────────────────────────────────┐
-│              NEXT.JS API ROUTES (Hybrid)                     │
-│  • Auth callbacks                                            │
-│  • Session management                                        │
+│              NEXT.JS API ROUTES (OAuth Only)                 │
+│  • OAuth callbacks (Twitter, LinkedIn, Reddit)               │
 │  • Proxy to Python backend                                   │
 └─────────────────────────────────────────────────────────────┘
                           ↓
 ┌─────────────────────────────────────────────────────────────┐
 │                 PYTHON BACKEND (FastAPI)                     │
+│  • Supabase JWT Verification                                 │
+│  • OAuth Token Management                                    │
 │  • Agentic AI (LangGraph)                                    │
 │  • Platform-specific content generation                      │
 │  • Social media posting                                      │
@@ -199,7 +201,7 @@ social-ai-agents/
 │   │   ├── auth/
 │   │   │   ├── LoginForm.tsx
 │   │   │   ├── SignupForm.tsx
-│   │   │   └── AuthProvider.tsx       # Supabase auth context
+│   │   │   └── AuthProvider.tsx       # Supabase auth + React Query
 │   │   ├── connections/
 │   │   │   ├── ConnectTwitter.tsx
 │   │   │   ├── ConnectedAccount.tsx
@@ -214,12 +216,22 @@ social-ai-agents/
 │   │   │   └── PostCard.tsx
 │   │   └── ui/                        # shadcn/ui components
 │   │
+│   ├── hooks/
+│   │   ├── auth/
+│   │   │   └── useAuth.ts             # React Query auth hook
+│   │   ├── api/
+│   │   │   ├── useConnections.ts      # OAuth connections
+│   │   │   ├── useContent.ts          # Content generation
+│   │   │   └── usePosts.ts            # Post history
+│   │   └── useRealtime.ts             # Real-time updates
+│   │
 │   ├── lib/
 │   │   ├── supabase/
 │   │   │   ├── client.ts              # Browser client
 │   │   │   ├── server.ts              # Server client
 │   │   │   └── middleware.ts          # Auth middleware
 │   │   ├── api.ts                     # API client
+│   │   ├── queryClient.ts             # React Query setup
 │   │   └── utils.ts
 │   │
 │   ├── middleware.ts                  # Next.js middleware for auth
@@ -277,20 +289,20 @@ social-ai-agents/
 
 ### **Phase 1: Foundation & Twitter OAuth (Days 1-3)**
 
-#### Day 1: Supabase Setup & Authentication
+#### Day 1: Supabase Setup & Client-Side Authentication
 **Backend:**
 - ✅ Set up Supabase project
 - ✅ Create database tables (profiles, connected_accounts, posts)
 - ✅ Configure RLS policies
 - ✅ Add Supabase service to backend
-- ✅ Create auth verification middleware
+- ✅ Create JWT verification middleware
 
 **Frontend:**
-- ✅ Install Supabase client
-- ✅ Create auth context provider
-- ✅ Build login/signup pages
-- ✅ Implement protected routes
-- ✅ Add auth middleware
+- ✅ Install Supabase client + React Query
+- ✅ Create useAuth hook with React Query
+- ✅ Build login/signup pages (client-side auth)
+- ✅ Implement protected routes with middleware
+- ✅ Add Next.js middleware for route protection
 
 **Files to Create:**
 ```
@@ -298,13 +310,15 @@ backend/auth/supabase_auth.py
 backend/services/supabase_service.py
 frontend/lib/supabase/client.ts
 frontend/lib/supabase/server.ts
+frontend/lib/queryClient.ts
+frontend/hooks/auth/useAuth.ts
 frontend/app/(auth)/login/page.tsx
 frontend/app/(auth)/signup/page.tsx
 frontend/components/auth/AuthProvider.tsx
 frontend/middleware.ts
 ```
 
-#### Day 2: Twitter OAuth 2.0
+#### Day 2: Twitter OAuth 2.0 + React Query
 **Backend:**
 - ✅ Update Twitter service to OAuth 2.0
 - ✅ Create OAuth flow endpoints
@@ -312,21 +326,23 @@ frontend/middleware.ts
 - ✅ Token refresh logic
 
 **Frontend:**
-- ✅ "Connect Twitter" button
+- ✅ Create useConnections hook with React Query
+- ✅ "Connect Twitter" button with React Query mutations
 - ✅ OAuth callback handling
-- ✅ Display connected accounts
-- ✅ Disconnect functionality
+- ✅ Display connected accounts with caching
+- ✅ Disconnect functionality with optimistic updates
 
 **Files to Create/Update:**
 ```
 backend/services/social/twitter_service.py (OAuth 2.0)
 frontend/app/api/auth/twitter/login/route.ts
 frontend/app/api/auth/twitter/callback/route.ts
+frontend/hooks/api/useConnections.ts
 frontend/components/connections/ConnectTwitter.tsx
 frontend/components/connections/ConnectedAccount.tsx
 ```
 
-#### Day 3: Agent Refactoring & Multi-User
+#### Day 3: Agent Refactoring & React Query Integration
 **Backend:**
 - ✅ Refactor agent to accept platform parameter
 - ✅ Create Twitter-specific tool
@@ -335,16 +351,19 @@ frontend/components/connections/ConnectedAccount.tsx
 - ✅ Save posts to Supabase
 
 **Frontend:**
-- ✅ Update dashboard with auth
-- ✅ Platform selector component
-- ✅ Content generator with preview
-- ✅ Post history from Supabase
+- ✅ Create useContent and usePosts hooks with React Query
+- ✅ Update dashboard with auth + React Query
+- ✅ Platform selector component with caching
+- ✅ Content generator with React Query mutations
+- ✅ Post history with React Query + real-time updates
 
 **Files to Update:**
 ```
 backend/agent/graph.py
 backend/agent/tools/twitter_tool.py
 backend/main.py (multi-user endpoints)
+frontend/hooks/api/useContent.ts
+frontend/hooks/api/usePosts.ts
 frontend/components/generator/ContentGenerator.tsx
 frontend/components/generator/PlatformSelector.tsx
 frontend/components/history/PostHistory.tsx
@@ -491,44 +510,69 @@ async def generate_twitter_content(state: AgentState) -> AgentState:
 
 ## API Endpoints
 
-### Authentication Endpoints (Next.js API Routes)
+### Authentication (Client-Side with Supabase)
 
-**POST /api/auth/signup**
+**Authentication is handled entirely on the frontend using Supabase Auth:**
+
 ```typescript
-Request:
-{
-  "email": "user@example.com",
-  "password": "securepassword",
-  "full_name": "John Doe"
-}
+// hooks/auth/useAuth.ts
+export function useAuth() {
+  const queryClient = useQueryClient()
+  const router = useRouter()
 
-Response:
-{
-  "user": { "id": "uuid", "email": "..." },
-  "session": { "access_token": "...", "refresh_token": "..." }
-}
-```
+  // Get auth data with React Query caching
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['auth'],
+    queryFn: getAuthData,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 1,
+    refetchOnWindowFocus: false,
+  })
 
-**POST /api/auth/login**
-```typescript
-Request:
-{
-  "email": "user@example.com",
-  "password": "securepassword"
-}
+  // Login mutation
+  const loginMutation = useMutation({
+    mutationFn: ({ email, password }: { email: string; password: string }) => 
+      loginUser(email, password),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['auth'] })
+    }
+  })
 
-Response:
-{
-  "user": { "id": "uuid", "email": "..." },
-  "session": { "access_token": "...", "refresh_token": "..." }
-}
-```
+  // Signup mutation
+  const signupMutation = useMutation({
+    mutationFn: ({ email, password }: { email: string; password: string }) => 
+      signupUser(email, password),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['auth'] })
+    }
+  })
 
-**POST /api/auth/logout**
-```typescript
-Response:
-{
-  "success": true
+  // Logout mutation
+  const logoutMutation = useMutation({
+    mutationFn: logoutUser,
+    onSuccess: () => {
+      queryClient.clear() // Clear all cached data
+      router.push('/login')
+    }
+  })
+
+  return {
+    user: data?.user || null,
+    profile: data?.profile || null,
+    isAuthenticated: !!data?.user,
+    isLoading,
+    isLoggingIn: loginMutation.isPending,
+    isSigningUp: signupMutation.isPending,
+    isLoggingOut: logoutMutation.isPending,
+    login: loginMutation.mutate,
+    signup: signupMutation.mutate,
+    logout: logoutMutation.mutate,
+    refetch,
+    error,
+    loginError: loginMutation.error,
+    signupError: signupMutation.error,
+    logoutError: logoutMutation.error,
+  }
 }
 ```
 
@@ -753,6 +797,8 @@ python-jose[cryptography]    # JWT handling
     "react-dom": "^18.2.0",
     "@supabase/supabase-js": "^2.39.0",
     "@supabase/auth-helpers-nextjs": "^0.8.7",
+    "@tanstack/react-query": "^5.0.0",
+    "@tanstack/react-query-devtools": "^5.0.0",
     "@radix-ui/react-slot": "^1.0.2",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
@@ -796,7 +842,7 @@ All tables have RLS enabled. Users can only:
 # backend/auth/dependencies.py
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
-    """Verify Supabase JWT token"""
+    """Verify Supabase JWT token from frontend"""
     try:
         payload = jwt.decode(
             token,
@@ -816,7 +862,7 @@ async def post_content(
     request: PostRequest,
     user_id: str = Depends(get_current_user)
 ):
-    # user_id is verified from JWT
+    # user_id is verified from Supabase JWT
     pass
 ```
 
@@ -842,24 +888,25 @@ app.add_middleware(
 ## Testing Strategy
 
 ### Phase 1 Testing
-1. ✅ Test Supabase auth (signup, login, logout)
-2. ✅ Test Twitter OAuth flow
-3. ✅ Test content generation for Twitter
-4. ✅ Test posting to Twitter (with user's token)
-5. ✅ Test post history retrieval
-6. ✅ Test RLS policies (try accessing other user's data)
+1. ✅ Test Supabase auth (client-side signup, login, logout)
+2. ✅ Test React Query state management
+3. ✅ Test Twitter OAuth flow
+4. ✅ Test content generation for Twitter
+5. ✅ Test posting to Twitter (with user's token)
+6. ✅ Test post history retrieval with caching
+7. ✅ Test RLS policies (try accessing other user's data)
 
 ### Test User Flow
 ```
-1. Sign up → Create account
-2. Login → Get session
+1. Sign up → Create account (client-side)
+2. Login → Get session (React Query)
 3. Connect Twitter → OAuth flow
-4. Generate content → AI creates tweet
-5. Preview → See content
-6. Post → Publish to Twitter
-7. View history → See past posts
-8. Disconnect → Remove Twitter connection
-9. Logout → End session
+4. Generate content → AI creates tweet (React Query mutation)
+5. Preview → See content (cached)
+6. Post → Publish to Twitter (optimistic updates)
+7. View history → See past posts (React Query + real-time)
+8. Disconnect → Remove Twitter connection (optimistic updates)
+9. Logout → End session (clear all cache)
 ```
 
 ---
@@ -917,15 +964,18 @@ cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
 - ❌ Remove: `backend/.env` Twitter credentials (now per-user)
 - ❌ Remove: `backend/data/tweets_history.json` (now in Supabase)
 - ❌ Remove: `backend/services/twitter_service.py` (OAuth 1.0a)
+- ❌ Remove: `/api/auth/login`, `/api/auth/signup` routes (client-side auth)
 - ✅ Add: Supabase integration
 - ✅ Add: OAuth 2.0 flows
 - ✅ Add: Multi-user support
+- ✅ Add: React Query state management
+- ✅ Add: Client-side authentication
 - ✅ Update: Agent to handle platform-specific generation
 
 ### What Stays the Same
 - ✅ Core agent logic (LangGraph)
 - ✅ Gemini integration
-- ✅ Frontend UI components (update for auth)
+- ✅ Frontend UI components (update for auth + React Query)
 - ✅ FastAPI structure
 
 ---
@@ -933,11 +983,12 @@ cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
 ## Success Metrics
 
 ### Phase 1 Complete When:
-- ✅ Users can sign up/login
+- ✅ Users can sign up/login (client-side with Supabase)
+- ✅ React Query manages all state (auth, connections, posts)
 - ✅ Users can connect Twitter via OAuth 2.0
-- ✅ Users can generate Twitter content
-- ✅ Users can post to their Twitter
-- ✅ Users can view their post history
+- ✅ Users can generate Twitter content (with React Query mutations)
+- ✅ Users can post to their Twitter (with optimistic updates)
+- ✅ Users can view their post history (with caching + real-time)
 - ✅ Multi-user works (User A can't see User B's data)
 
 ### Phase 2 Complete When:
@@ -961,19 +1012,20 @@ cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
 By completing this project, you'll learn:
 
 ### Backend
-- ✅ FastAPI with authentication middleware
+- ✅ FastAPI with JWT verification middleware
 - ✅ OAuth 2.0 flow implementation
 - ✅ Supabase Python client
-- ✅ JWT token verification
+- ✅ JWT token verification from frontend
 - ✅ LangGraph agent with conditional routing
 - ✅ Platform-specific tool creation
 
 ### Frontend
 - ✅ Next.js 14 App Router
-- ✅ Supabase authentication
+- ✅ Supabase client-side authentication
+- ✅ React Query state management
 - ✅ Protected routes & middleware
 - ✅ OAuth callback handling
-- ✅ Server-side rendering with auth
+- ✅ Optimistic updates & caching
 
 ### Database
 - ✅ PostgreSQL schema design
