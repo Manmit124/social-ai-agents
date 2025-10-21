@@ -16,8 +16,8 @@ import {
 
 const navigation = [
   { name: "Generate Tweet", href: "/dashboard", icon: Sparkles },
-  { name: "History", href: "/dashboard/history", icon: History },
-  { name: "Settings", href: "/dashboard/settings", icon: Settings },
+  { name: "History", href: "/history", icon: History },
+  { name: "Settings", href: "/settings", icon: Settings },
 ];
 
 export function Sidebar() {
