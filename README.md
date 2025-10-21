@@ -168,3 +168,4 @@ MIT
 Built with ❤️ using AI Agents
 
 source venv/bin/activate && python3 main.py
+ source venv/bin/activate && pip install -r requirements.txt

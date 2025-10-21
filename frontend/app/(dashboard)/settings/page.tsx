@@ -1,11 +1,15 @@
 "use client";
 
 import { useAuth } from "@/hooks/auth/useAuth";
+import { useConnections } from "@/hooks/api/useConnections";
 import { Settings, User, Twitter, Bell } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConnectTwitter } from "@/components/connections/ConnectTwitter";
+import { ConnectedAccount } from "@/components/connections/ConnectedAccount";
 
 export default function SettingsPage() {
   const { user } = useAuth();
+  const { connections, isLoading } = useConnections();
 
   return (
     <div className="flex h-full flex-col p-8">
@@ -45,10 +49,28 @@ export default function SettingsPage() {
               Manage your social media connections
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              No accounts connected yet
-            </p>
+          <CardContent className="space-y-4">
+            {isLoading ? (
+              <p className="text-sm text-muted-foreground">Loading connections...</p>
+            ) : connections && connections.length > 0 ? (
+              <>
+                <div className="space-y-4">
+                  {connections.map((connection) => (
+                    <ConnectedAccount key={connection.platform} connection={connection} />
+                  ))}
+                </div>
+                {!connections.some(c => c.platform === "twitter") && (
+                  <ConnectTwitter />
+                )}
+              </>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  No accounts connected yet
+                </p>
+                <ConnectTwitter />
+              </div>
+            )}
           </CardContent>
         </Card>
 

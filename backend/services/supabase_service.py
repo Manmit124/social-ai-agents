@@ -27,10 +27,14 @@ class SupabaseService:
         Verify Supabase JWT token and return user data
         """
         try:
+            # Decode JWT with audience validation
+            # Supabase uses "authenticated" as the default audience
             payload = jwt.decode(
                 token,
                 self.jwt_secret,
-                algorithms=["HS256"]
+                algorithms=["HS256"],
+                audience="authenticated",
+                options={"verify_aud": True}
             )
             user_id = payload.get("sub")
             if not user_id:

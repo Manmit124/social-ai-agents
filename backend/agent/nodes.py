@@ -41,7 +41,7 @@ async def plan_node(state: AgentState) -> AgentState:
 
 async def generate_node(state: AgentState) -> AgentState:
     """
-    Generation node - calls Gemini to generate tweet content.
+    Generation node - calls Gemini to generate content.
     
     Args:
         state: Current agent state
@@ -49,14 +49,15 @@ async def generate_node(state: AgentState) -> AgentState:
     Returns:
         Updated state with generated content
     """
-    print("✍️  Generating: Creating tweet content...")
+    platform = state.get("platform", "twitter")
+    print(f"✍️  Generating: Creating {platform} content...")
     
     state["step"] = "generating"
     
     try:
-        # Generate tweet content using Gemini
+        # Generate content using Gemini with platform-specific prompts
         gemini_service = get_gemini_service()
-        tweet_content = await gemini_service.generate_tweet(state["user_prompt"])
+        tweet_content = await gemini_service.generate_tweet(state["user_prompt"], platform)
         state["tweet_content"] = tweet_content
         state["is_valid"] = True
         
@@ -101,14 +102,15 @@ async def hashtag_node(state: AgentState) -> AgentState:
     Returns:
         Updated state with hashtags
     """
+    platform = state.get("platform", "twitter")
     print("🏷️  Hashtags: Generating relevant hashtags...")
     
     state["step"] = "hashtags"
     
     try:
-        # Generate hashtags using Gemini
+        # Generate hashtags using Gemini with platform-specific prompts
         gemini_service = get_gemini_service()
-        hashtags = await gemini_service.generate_hashtags(state["tweet_content"])
+        hashtags = await gemini_service.generate_hashtags(state["tweet_content"], platform)
         state["hashtags"] = hashtags
         
     except Exception as e:
