@@ -1,59 +1,162 @@
-# AI Agents Tweet - Project Plan
+# Social AI Agents - Multi-Platform OAuth Project Plan
 
 ## Project Overview
-Build an agentic AI application that generates tweet content from user prompts using Google Gemini and posts to Twitter with user confirmation.
+Build a multi-user, multi-platform social media AI agent that generates platform-specific content and posts to Twitter, LinkedIn, and Reddit using OAuth authentication.
+
+**Branch:** `feat/oauth`
 
 **Tech Stack:**
+- **Frontend:** Next.js 14 + TypeScript + Tailwind CSS + shadcn/ui
 - **Backend:** Python 3.9+ with FastAPI + LangGraph (Agentic AI)
-- **Frontend:** Next.js 14 with Tailwind CSS + shadcn/ui
-- **AI:** Google Gemini Pro
-- **Social:** Twitter API (Free Tier)
-- **Storage:** JSON file for tweet history
-- **Deployment:** Render (backend) + Vercel (frontend)
+- **Database & Auth:** Supabase (PostgreSQL + Auth)
+- **AI:** Google Gemini 2.0
+- **Social APIs:** Twitter OAuth 2.0, LinkedIn OAuth 2.0, Reddit OAuth 2.0
 
 ---
 
-## Architecture
+## Architecture Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                       USER INTERFACE                         │
-│                    (Next.js Frontend)                        │
-│                                                              │
-│  [Text Input] → [Generate Button] → [Preview Card]          │
-│                                      ↓                       │
-│                                [Confirm Post Button]         │
-└─────────────────────────────────────────────────────────────┘
-                          ↓ HTTP Request
-┌─────────────────────────────────────────────────────────────┐
-│                    BACKEND API SERVER                        │
-│                    (FastAPI + Python)                        │
-│                                                              │
-│  POST /api/generate  →  Returns generated tweet              │
-│  POST /api/post      →  Posts to Twitter                    │
-│  GET  /api/history   →  Returns tweet history               │
+│                    FRONTEND (Next.js)                        │
+│  • Supabase Auth (Client-side)                               │
+│  • React Query State Management                              │
+│  • Next.js Middleware (Route Protection)                     │
+│  • Content Generation UI                                     │
+│  • Platform Selection & Preview                              │
 └─────────────────────────────────────────────────────────────┘
                           ↓
 ┌─────────────────────────────────────────────────────────────┐
-│                    AGENTIC AI LAYER                          │
-│                      (LangGraph)                             │
-│                                                              │
-│  ┌──────────────────────────────────────────────────┐      │
-│  │  [Start] → [Plan] → [Generate] → [Validate]     │      │
-│  │              ↓         ↓            ↓            │      │
-│  │         [Gemini]  [Hashtags]  [Check Length]    │      │
-│  │                                  ↓               │      │
-│  │                              [Return]            │      │
-│  └──────────────────────────────────────────────────┘      │
+│              NEXT.JS API ROUTES (OAuth Only)                 │
+│  • OAuth callbacks (Twitter, LinkedIn, Reddit)               │
+│  • Proxy to Python backend                                   │
 └─────────────────────────────────────────────────────────────┘
                           ↓
 ┌─────────────────────────────────────────────────────────────┐
-│                   EXTERNAL SERVICES                          │
-│                                                              │
-│  • Google Gemini API (Content Generation)                   │
-│  • Twitter API v2 (Posting Tweets)                          │
-│  • tweets_history.json (Local Storage)                      │
+│                 PYTHON BACKEND (FastAPI)                     │
+│  • Supabase JWT Verification                                 │
+│  • OAuth Token Management                                    │
+│  • Agentic AI (LangGraph)                                    │
+│  • Platform-specific content generation                      │
+│  • Social media posting                                      │
 └─────────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────────┐
+│                    SUPABASE                                  │
+│  • PostgreSQL Database                                       │
+│  • Row Level Security (RLS)                                  │
+│  • Authentication Service                                    │
+└─────────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────────┐
+│              SOCIAL MEDIA PLATFORMS                          │
+│  • Twitter API v2 (OAuth 2.0)                                │
+│  • LinkedIn API (OAuth 2.0) - Phase 2                        │
+│  • Reddit API (OAuth 2.0) - Phase 3                          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Database Schema (Supabase PostgreSQL)
+
+### Table: `users` (Managed by Supabase Auth)
+```sql
+-- Supabase creates this automatically
+id: uuid (primary key)
+email: text
+encrypted_password: text
+created_at: timestamp
+updated_at: timestamp
+```
+
+### Table: `profiles`
+```sql
+CREATE TABLE profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  username TEXT,
+  full_name TEXT,
+  avatar_url TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Enable RLS
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Users can only see and edit their own profile
+CREATE POLICY "Users can view own profile" ON profiles
+  FOR SELECT USING (auth.uid() = id);
+
+CREATE POLICY "Users can update own profile" ON profiles
+  FOR UPDATE USING (auth.uid() = id);
+```
+
+### Table: `connected_accounts`
+```sql
+CREATE TABLE connected_accounts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  platform TEXT NOT NULL, -- 'twitter', 'linkedin', 'reddit'
+  platform_user_id TEXT NOT NULL, -- User ID on the platform
+  platform_username TEXT, -- @username on platform
+  access_token TEXT NOT NULL,
+  refresh_token TEXT,
+  token_expires_at TIMESTAMP WITH TIME ZONE,
+  scope TEXT[], -- OAuth scopes granted
+  is_active BOOLEAN DEFAULT TRUE,
+  connected_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  
+  UNIQUE(user_id, platform) -- One account per platform per user
+);
+
+-- Enable RLS
+ALTER TABLE connected_accounts ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Users can only see their own connected accounts
+CREATE POLICY "Users can view own accounts" ON connected_accounts
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own accounts" ON connected_accounts
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own accounts" ON connected_accounts
+  FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own accounts" ON connected_accounts
+  FOR DELETE USING (auth.uid() = user_id);
+```
+
+### Table: `posts`
+```sql
+CREATE TABLE posts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  platform TEXT NOT NULL, -- 'twitter', 'linkedin', 'reddit'
+  user_prompt TEXT NOT NULL, -- Original user input
+  generated_content TEXT NOT NULL, -- AI-generated content
+  hashtags TEXT[], -- Generated hashtags
+  platform_post_id TEXT, -- ID from social platform
+  platform_post_url TEXT, -- URL to the post
+  status TEXT DEFAULT 'posted', -- 'posted', 'failed', 'deleted'
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Enable RLS
+ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Users can only see their own posts
+CREATE POLICY "Users can view own posts" ON posts
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own posts" ON posts
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- Indexes for performance
+CREATE INDEX idx_posts_user_id ON posts(user_id);
+CREATE INDEX idx_posts_platform ON posts(platform);
+CREATE INDEX idx_posts_created_at ON posts(created_at DESC);
 ```
 
 ---
@@ -61,648 +164,880 @@ Build an agentic AI application that generates tweet content from user prompts u
 ## Project Structure
 
 ```
-ai-agents-tweet/
-│
-├── backend/                              # Python Backend
-│   ├── main.py                          # FastAPI app entry point
-│   ├── requirements.txt                 # Python dependencies
-│   ├── .env                             # Environment variables (gitignored)
-│   ├── .env.example                     # Environment template
-│   │
-│   ├── agent/                           # LangGraph Agent
-│   │   ├── __init__.py
-│   │   ├── graph.py                    # Agent state graph definition
-│   │   ├── nodes.py                    # Agent node functions
-│   │   ├── state.py                    # Agent state schema
-│   │   └── tools.py                    # Agent tools (functions)
-│   │
-│   ├── services/                        # External service integrations
-│   │   ├── __init__.py
-│   │   ├── gemini_service.py           # Gemini API wrapper
-│   │   └── twitter_service.py          # Twitter API wrapper
-│   │
-│   ├── prompts/                         # Prompt engineering
-│   │   ├── __init__.py
-│   │   └── templates.py                # Prompt templates
-│   │
-│   ├── storage/                         # Data storage
-│   │   ├── __init__.py
-│   │   └── tweet_storage.py            # JSON file operations
-│   │
-│   ├── models/                          # Pydantic models
-│   │   ├── __init__.py
-│   │   └── schemas.py                  # Request/Response models
-│   │
-│   └── data/                            # Data files
-│       └── tweets_history.json         # Tweet storage (gitignored)
-│
-├── frontend/                             # Next.js Frontend
+social-ai-agents/
+├── frontend/                           # Next.js Frontend
 │   ├── app/
-│   │   ├── layout.tsx                  # Root layout
-│   │   ├── page.tsx                    # Home page
-│   │   ├── globals.css                 # Global styles
-│   │   └── api/                        # API routes (proxy to backend)
-│   │       └── proxy/
-│   │           └── [...path]/
-│   │               └── route.ts
+│   │   ├── (auth)/                    # Auth routes group
+│   │   │   ├── login/
+│   │   │   │   └── page.tsx
+│   │   │   ├── signup/
+│   │   │   │   └── page.tsx
+│   │   │   └── layout.tsx
+│   │   ├── (dashboard)/               # Protected routes
+│   │   │   ├── dashboard/
+│   │   │   │   └── page.tsx           # Main dashboard
+│   │   │   ├── connections/
+│   │   │   │   └── page.tsx           # Manage connections
+│   │   │   ├── history/
+│   │   │   │   └── page.tsx           # Post history
+│   │   │   └── layout.tsx             # Dashboard layout
+│   │   ├── api/
+│   │   │   ├── auth/
+│   │   │   │   ├── twitter/
+│   │   │   │   │   ├── login/
+│   │   │   │   │   │   └── route.ts
+│   │   │   │   │   └── callback/
+│   │   │   │   │       └── route.ts
+│   │   │   │   ├── linkedin/          # Phase 2
+│   │   │   │   └── reddit/            # Phase 3
+│   │   │   └── proxy/
+│   │   │       └── [...path]/
+│   │   │           └── route.ts       # Proxy to Python
+│   │   ├── layout.tsx
+│   │   ├── page.tsx                   # Landing page
+│   │   └── globals.css
 │   │
-│   ├── components/                      # React components
-│   │   ├── ui/                         # shadcn/ui components
-│   │   │   ├── button.tsx
-│   │   │   ├── card.tsx
-│   │   │   ├── textarea.tsx
-│   │   │   └── ...
-│   │   ├── TweetGenerator.tsx          # Main form component
-│   │   ├── TweetPreview.tsx            # Preview card
-│   │   └── TweetHistory.tsx            # History list
+│   ├── components/
+│   │   ├── auth/
+│   │   │   ├── LoginForm.tsx
+│   │   │   ├── SignupForm.tsx
+│   │   │   └── AuthProvider.tsx       # Supabase auth + React Query
+│   │   ├── connections/
+│   │   │   ├── ConnectTwitter.tsx
+│   │   │   ├── ConnectedAccount.tsx
+│   │   │   └── ConnectionsList.tsx
+│   │   ├── generator/
+│   │   │   ├── ContentGenerator.tsx   # Main generator
+│   │   │   ├── PlatformSelector.tsx
+│   │   │   ├── ContentPreview.tsx
+│   │   │   └── PostButton.tsx
+│   │   ├── history/
+│   │   │   ├── PostHistory.tsx
+│   │   │   └── PostCard.tsx
+│   │   └── ui/                        # shadcn/ui components
+│   │
+│   ├── hooks/
+│   │   ├── auth/
+│   │   │   └── useAuth.ts             # React Query auth hook
+│   │   ├── api/
+│   │   │   ├── useConnections.ts      # OAuth connections
+│   │   │   ├── useContent.ts          # Content generation
+│   │   │   └── usePosts.ts            # Post history
+│   │   └── useRealtime.ts             # Real-time updates
 │   │
 │   ├── lib/
-│   │   ├── utils.ts                    # Utility functions
-│   │   └── api.ts                      # API client
+│   │   ├── supabase/
+│   │   │   ├── client.ts              # Browser client
+│   │   │   ├── server.ts              # Server client
+│   │   │   └── middleware.ts          # Auth middleware
+│   │   ├── api.ts                     # API client
+│   │   ├── queryClient.ts             # React Query setup
+│   │   └── utils.ts
 │   │
-│   ├── .env.local                       # Frontend env vars
-│   ├── .env.example
-│   ├── package.json
-│   ├── tsconfig.json
-│   ├── tailwind.config.ts
-│   ├── next.config.js
-│   └── components.json                  # shadcn/ui config
+│   ├── middleware.ts                  # Next.js middleware for auth
+│   ├── .env.local
+│   └── package.json
 │
-├── .gitignore                            # Git ignore rules
-├── README.md                             # Project documentation
-└── PLAN.md                               # This file
-
+├── backend/                            # Python Backend
+│   ├── main.py                        # FastAPI app
+│   ├── requirements.txt
+│   ├── .env
+│   │
+│   ├── auth/
+│   │   ├── __init__.py
+│   │   ├── supabase_auth.py          # Verify Supabase tokens
+│   │   └── dependencies.py            # FastAPI dependencies
+│   │
+│   ├── agent/
+│   │   ├── __init__.py
+│   │   ├── graph.py                   # Core LangGraph agent
+│   │   ├── nodes.py                   # Agent nodes
+│   │   ├── state.py                   # Agent state
+│   │   └── tools/                     # Platform-specific tools
+│   │       ├── __init__.py
+│   │       ├── twitter_tool.py        # Twitter content generation
+│   │       ├── linkedin_tool.py       # Phase 2
+│   │       └── reddit_tool.py         # Phase 3
+│   │
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── gemini_service.py         # Gemini API
+│   │   ├── supabase_service.py       # Supabase operations
+│   │   └── social/
+│   │       ├── __init__.py
+│   │       ├── twitter_service.py    # Twitter OAuth 2.0 & posting
+│   │       ├── linkedin_service.py   # Phase 2
+│   │       └── reddit_service.py     # Phase 3
+│   │
+│   ├── models/
+│   │   ├── __init__.py
+│   │   └── schemas.py                # Pydantic models
+│   │
+│   └── prompts/
+│       ├── __init__.py
+│       └── templates.py              # Platform-specific prompts
+│
+├── .gitignore
+├── README.md
+├── PLAN.md                            # This file
+└── SETUP.md
 ```
 
 ---
 
-## Backend Implementation Details
+## Implementation Phases
 
-### 1. Agent Flow (LangGraph)
+### **Phase 1: Foundation & Twitter OAuth (Days 1-3)**
+
+#### Day 1: Supabase Setup & Client-Side Authentication
+**Backend:**
+- ✅ Set up Supabase project
+- ✅ Create database tables (profiles, connected_accounts, posts)
+- ✅ Configure RLS policies
+- ✅ Add Supabase service to backend
+- ✅ Create JWT verification middleware
+
+**Frontend:**
+- ✅ Install Supabase client + React Query
+- ✅ Create useAuth hook with React Query
+- ✅ Build login/signup pages (client-side auth)
+- ✅ Implement protected routes with middleware
+- ✅ Add Next.js middleware for route protection
+
+**Files to Create:**
+```
+backend/auth/supabase_auth.py
+backend/services/supabase_service.py
+frontend/lib/supabase/client.ts
+frontend/lib/supabase/server.ts
+frontend/lib/queryClient.ts
+frontend/hooks/auth/useAuth.ts
+frontend/app/(auth)/login/page.tsx
+frontend/app/(auth)/signup/page.tsx
+frontend/components/auth/AuthProvider.tsx
+frontend/middleware.ts
+```
+
+#### Day 2: Twitter OAuth 2.0 + React Query
+**Backend:**
+- ✅ Update Twitter service to OAuth 2.0
+- ✅ Create OAuth flow endpoints
+- ✅ Token storage in Supabase
+- ✅ Token refresh logic
+
+**Frontend:**
+- ✅ Create useConnections hook with React Query
+- ✅ "Connect Twitter" button with React Query mutations
+- ✅ OAuth callback handling
+- ✅ Display connected accounts with caching
+- ✅ Disconnect functionality with optimistic updates
+
+**Files to Create/Update:**
+```
+backend/services/social/twitter_service.py (OAuth 2.0)
+frontend/app/api/auth/twitter/login/route.ts
+frontend/app/api/auth/twitter/callback/route.ts
+frontend/hooks/api/useConnections.ts
+frontend/components/connections/ConnectTwitter.tsx
+frontend/components/connections/ConnectedAccount.tsx
+```
+
+#### Day 3: Agent Refactoring & React Query Integration
+**Backend:**
+- ✅ Refactor agent to accept platform parameter
+- ✅ Create Twitter-specific tool
+- ✅ Update content generation for Twitter
+- ✅ Multi-user post endpoint (uses user's tokens)
+- ✅ Save posts to Supabase
+
+**Frontend:**
+- ✅ Create useContent and usePosts hooks with React Query
+- ✅ Update dashboard with auth + React Query
+- ✅ Platform selector component with caching
+- ✅ Content generator with React Query mutations
+- ✅ Post history with React Query + real-time updates
+
+**Files to Update:**
+```
+backend/agent/graph.py
+backend/agent/tools/twitter_tool.py
+backend/main.py (multi-user endpoints)
+frontend/hooks/api/useContent.ts
+frontend/hooks/api/usePosts.ts
+frontend/components/generator/ContentGenerator.tsx
+frontend/components/generator/PlatformSelector.tsx
+frontend/components/history/PostHistory.tsx
+```
+
+---
+
+### **Phase 2: LinkedIn Integration (Days 4-5)**
+
+#### Day 4: LinkedIn OAuth
+- ✅ Create LinkedIn OAuth service
+- ✅ Add LinkedIn connection flow
+- ✅ Store LinkedIn tokens
+
+#### Day 5: LinkedIn Content Generation
+- ✅ Create LinkedIn tool (longer content, professional tone)
+- ✅ Platform-specific prompts for LinkedIn
+- ✅ LinkedIn posting API integration
+
+**Files to Create:**
+```
+backend/services/social/linkedin_service.py
+backend/agent/tools/linkedin_tool.py
+frontend/app/api/auth/linkedin/login/route.ts
+frontend/app/api/auth/linkedin/callback/route.ts
+frontend/components/connections/ConnectLinkedIn.tsx
+```
+
+---
+
+### **Phase 3: Reddit Integration (Days 6-7)**
+
+#### Day 6: Reddit OAuth
+- ✅ Create Reddit OAuth service
+- ✅ Add Reddit connection flow
+- ✅ Store Reddit tokens
+
+#### Day 7: Reddit Content Generation
+- ✅ Create Reddit tool (title + body format)
+- ✅ Subreddit selection
+- ✅ Reddit posting API integration
+
+**Files to Create:**
+```
+backend/services/social/reddit_service.py
+backend/agent/tools/reddit_tool.py
+frontend/app/api/auth/reddit/login/route.ts
+frontend/app/api/auth/reddit/callback/route.ts
+frontend/components/connections/ConnectReddit.tsx
+frontend/components/generator/SubredditSelector.tsx
+```
+
+---
+
+## Core Agent Architecture
+
+### LangGraph Agent Flow
 
 ```python
-# agent/graph.py - State Graph Definition
+# agent/graph.py
 
 State Flow:
-┌─────────┐
-│  START  │
-└────┬────┘
-     ↓
-┌────────────────┐
-│  PLAN_NODE     │  # Agent analyzes the prompt
-│                │  # Decides on tweet strategy
-└────┬───────────┘
-     ↓
-┌────────────────┐
-│ GENERATE_NODE  │  # Calls Gemini to generate content
-│                │  # Uses prompt template
-└────┬───────────┘
-     ↓
-┌────────────────┐
-│ VALIDATE_NODE  │  # Check character limit (280)
-│                │  # Basic quality check
-└────┬───────────┘
-     ↓
-┌────────────────┐
-│ HASHTAG_NODE   │  # Suggest relevant hashtags
-│                │  # Add if under char limit
-└────┬───────────┘
-     ↓
-┌────────────────┐
-│  FINALIZE_NODE │  # Prepare final tweet
-│                │  # Return to user
-└────┬───────────┘
-     ↓
-┌─────────┐
-│   END   │
-└─────────┘
+┌─────────────┐
+│   START     │
+└──────┬──────┘
+       ↓
+┌─────────────────┐
+│  ROUTE_NODE     │  # Determines which platform tool to use
+│  (platform?)    │
+└──────┬──────────┘
+       ↓
+    ┌──┴──────────────────────────┐
+    │                             │
+    ↓                             ↓
+┌───────────────┐          ┌──────────────┐
+│ TWITTER_TOOL  │          │ LINKEDIN_TOOL│ (Phase 2)
+│               │          │              │
+│ • Max 280ch   │          │ • Max 3000ch │
+│ • Hashtags    │          │ • Professional│
+│ • Casual tone │          │ • No hashtags │
+└───────┬───────┘          └──────┬───────┘
+        ↓                         ↓
+┌────────────────────────────────────┐
+│        VALIDATE_NODE               │
+│        (check content)             │
+└────────────┬───────────────────────┘
+             ↓
+┌────────────────────────────────────┐
+│        FINALIZE_NODE               │
+│        (prepare for posting)       │
+└────────────┬───────────────────────┘
+             ↓
+        ┌────────┐
+        │  END   │
+        └────────┘
 ```
 
-**Agent State Schema:**
+### Agent State Schema
+
 ```python
+# agent/state.py
+
 class AgentState(TypedDict):
-    user_prompt: str          # Original user input
-    tweet_content: str        # Generated tweet
-    hashtags: List[str]       # Suggested hashtags
-    char_count: int           # Character count
-    is_valid: bool            # Validation status
-    error: Optional[str]      # Error message if any
-    step: str                 # Current step name
+    user_id: str                    # Supabase user ID
+    user_prompt: str                # Original user input
+    platform: str                   # 'twitter', 'linkedin', 'reddit'
+    generated_content: str          # Platform-specific content
+    hashtags: Optional[List[str]]   # For Twitter
+    title: Optional[str]            # For Reddit
+    char_count: int                 # Character count
+    is_valid: bool                  # Validation status
+    error: Optional[str]            # Error message
+    metadata: dict                  # Platform-specific metadata
 ```
 
-**Agent Tools:**
-- `generate_tweet_content(prompt: str) -> str` - Calls Gemini
-- `validate_tweet(content: str) -> bool` - Checks length/quality
-- `suggest_hashtags(content: str) -> List[str]` - Generates hashtags
-- `combine_content_and_hashtags(content: str, hashtags: List[str]) -> str` - Merges
+### Platform Tools
 
-### 2. API Endpoints
+```python
+# agent/tools/twitter_tool.py
+
+async def generate_twitter_content(state: AgentState) -> AgentState:
+    """
+    Generate Twitter-optimized content:
+    - Max 280 characters (250 + hashtags)
+    - Casual, engaging tone
+    - Include emojis
+    - Generate 2-3 hashtags
+    """
+    prompt = TWITTER_PROMPT_TEMPLATE.format(
+        user_prompt=state["user_prompt"]
+    )
+    
+    content = await gemini_service.generate(prompt)
+    hashtags = await gemini_service.generate_hashtags(content)
+    
+    state["generated_content"] = content
+    state["hashtags"] = hashtags
+    state["char_count"] = len(content + " ".join(hashtags))
+    
+    return state
+```
+
+---
+
+## API Endpoints
+
+### Authentication (Client-Side with Supabase)
+
+**Authentication is handled entirely on the frontend using Supabase Auth:**
+
+```typescript
+// hooks/auth/useAuth.ts
+export function useAuth() {
+  const queryClient = useQueryClient()
+  const router = useRouter()
+
+  // Get auth data with React Query caching
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['auth'],
+    queryFn: getAuthData,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 1,
+    refetchOnWindowFocus: false,
+  })
+
+  // Login mutation
+  const loginMutation = useMutation({
+    mutationFn: ({ email, password }: { email: string; password: string }) => 
+      loginUser(email, password),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['auth'] })
+    }
+  })
+
+  // Signup mutation
+  const signupMutation = useMutation({
+    mutationFn: ({ email, password }: { email: string; password: string }) => 
+      signupUser(email, password),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['auth'] })
+    }
+  })
+
+  // Logout mutation
+  const logoutMutation = useMutation({
+    mutationFn: logoutUser,
+    onSuccess: () => {
+      queryClient.clear() // Clear all cached data
+      router.push('/login')
+    }
+  })
+
+  return {
+    user: data?.user || null,
+    profile: data?.profile || null,
+    isAuthenticated: !!data?.user,
+    isLoading,
+    isLoggingIn: loginMutation.isPending,
+    isSigningUp: signupMutation.isPending,
+    isLoggingOut: logoutMutation.isPending,
+    login: loginMutation.mutate,
+    signup: signupMutation.mutate,
+    logout: logoutMutation.mutate,
+    refetch,
+    error,
+    loginError: loginMutation.error,
+    signupError: signupMutation.error,
+    logoutError: logoutMutation.error,
+  }
+}
+```
+
+---
+
+### Social OAuth Endpoints (Next.js API Routes)
+
+**GET /api/auth/twitter/login**
+```typescript
+Response: Redirect to Twitter OAuth
+```
+
+**GET /api/auth/twitter/callback**
+```typescript
+Query Params: code, state
+
+Response: Redirect to dashboard with success message
+```
+
+---
+
+### Content Generation Endpoints (Python Backend)
 
 **POST /api/generate**
 ```python
+Headers:
+{
+  "Authorization": "Bearer {supabase_access_token}"
+}
+
 Request:
 {
-  "prompt": "Write about AI and creativity"
+  "prompt": "Write about AI in healthcare",
+  "platform": "twitter"  # or "linkedin", "reddit"
 }
 
 Response:
 {
   "success": true,
   "data": {
-    "content": "AI is transforming creativity...",
-    "hashtags": ["#AI", "#Creativity"],
-    "char_count": 145,
-    "steps": [
-      {"step": "planning", "message": "Analyzing prompt..."},
-      {"step": "generating", "message": "Creating content..."},
-      {"step": "validating", "message": "Checking quality..."},
-      {"step": "finalizing", "message": "Adding hashtags..."}
-    ]
+    "content": "AI is revolutionizing healthcare...",
+    "hashtags": ["#AI", "#Healthcare", "#Innovation"],
+    "char_count": 245,
+    "platform": "twitter"
   }
 }
 ```
 
 **POST /api/post**
 ```python
+Headers:
+{
+  "Authorization": "Bearer {supabase_access_token}"
+}
+
 Request:
 {
-  "content": "AI is transforming creativity... #AI #Creativity",
-  "user_prompt": "Write about AI and creativity"
+  "content": "AI is revolutionizing healthcare... #AI #Healthcare",
+  "platform": "twitter",
+  "user_prompt": "Write about AI in healthcare"
 }
 
 Response:
 {
   "success": true,
-  "tweet_id": "1234567890",
-  "url": "https://twitter.com/user/status/1234567890"
+  "post_id": "uuid",
+  "platform_post_id": "1234567890",
+  "platform_post_url": "https://twitter.com/user/status/1234567890"
 }
 ```
 
 **GET /api/history**
 ```python
+Headers:
+{
+  "Authorization": "Bearer {supabase_access_token}"
+}
+
+Query Params: ?platform=twitter&limit=50
+
 Response:
 {
   "success": true,
-  "tweets": [
+  "posts": [
     {
-      "id": "uuid-1",
-      "prompt": "Write about AI",
-      "content": "AI is...",
-      "posted_at": "2025-10-17T10:30:00Z",
-      "tweet_url": "https://twitter.com/..."
+      "id": "uuid",
+      "platform": "twitter",
+      "content": "...",
+      "platform_post_url": "...",
+      "created_at": "2025-10-17T..."
     }
   ]
 }
 ```
 
-### 3. Core Services
-
-**Gemini Service (`services/gemini_service.py`)**
-```python
-class GeminiService:
-    def __init__(self, api_key: str):
-        # Initialize Gemini client
-        
-    async def generate_tweet(self, prompt: str) -> str:
-        # Call Gemini with optimized prompt
-        # Return tweet content
-        
-    async def generate_hashtags(self, content: str) -> List[str]:
-        # Generate relevant hashtags
-```
-
-**Twitter Service (`services/twitter_service.py`)**
-```python
-class TwitterService:
-    def __init__(self, credentials: dict):
-        # Initialize Tweepy client (Free tier compatible)
-        
-    async def post_tweet(self, content: str) -> dict:
-        # Post to Twitter
-        # Return tweet ID and URL
-        
-    def validate_content(self, content: str) -> bool:
-        # Check if content meets Twitter requirements
-```
-
-**Tweet Storage (`storage/tweet_storage.py`)**
-```python
-class TweetStorage:
-    def __init__(self, file_path: str = "data/tweets_history.json"):
-        # Initialize JSON file storage
-        
-    def save_tweet(self, tweet_data: dict) -> None:
-        # Append to JSON file
-        
-    def get_history(self, limit: int = 50) -> List[dict]:
-        # Read from JSON file
-```
-
-### 4. Prompt Engineering
-
-**System Prompt Template (`prompts/templates.py`)**
-```python
-TWEET_GENERATION_PROMPT = """
-You are an expert social media content creator specializing in Twitter/X.
-
-Task: Create an engaging tweet based on the user's prompt.
-
-Requirements:
-- Maximum 250 characters (to leave room for hashtags)
-- Engaging and conversational tone
-- Clear and concise
-- Include relevant emojis if appropriate
-- Do not include hashtags (will be added separately)
-
-User Prompt: {user_prompt}
-
-Generate only the tweet content, nothing else.
-"""
-
-HASHTAG_GENERATION_PROMPT = """
-Based on this tweet content, suggest 2-3 relevant hashtags.
-
-Tweet: {tweet_content}
-
-Return only hashtags separated by spaces, like: #AI #Tech #Innovation
-"""
-```
-
 ---
 
-## Frontend Implementation Details
+### Connection Management Endpoints (Python Backend)
 
-### 1. Main Component Structure
+**GET /api/connections**
+```python
+Headers:
+{
+  "Authorization": "Bearer {supabase_access_token}"
+}
 
-**TweetGenerator Component (`components/TweetGenerator.tsx`)**
-```typescript
-Features:
-- Textarea for user prompt
-- "Generate Tweet" button
-- Loading state with skeleton
-- Shows agent steps in real-time (optional)
-- Displays generated preview
-
-States:
-- prompt: string
-- loading: boolean
-- generatedTweet: TweetData | null
-- error: string | null
+Response:
+{
+  "success": true,
+  "connections": [
+    {
+      "platform": "twitter",
+      "platform_username": "@johndoe",
+      "is_active": true,
+      "connected_at": "2025-10-17T..."
+    }
+  ]
+}
 ```
 
-**TweetPreview Component (`components/TweetPreview.tsx`)**
-```typescript
-Features:
-- Card showing generated content
-- Character count display
-- Hashtags shown separately
-- "Post to Twitter" button
-- "Regenerate" button
-- Success/error feedback
+**DELETE /api/connections/{platform}**
+```python
+Headers:
+{
+  "Authorization": "Bearer {supabase_access_token}"
+}
 
-Props:
-- content: string
-- hashtags: string[]
-- charCount: number
-- onPost: () => Promise<void>
-- onRegenerate: () => void
-```
-
-**TweetHistory Component (`components/TweetHistory.tsx`)**
-```typescript
-Features:
-- List of previously posted tweets
-- Shows prompt + generated content
-- Links to Twitter posts
-- Timestamp display
-- Pagination (if needed)
-```
-
-### 2. UI Design (Tailwind + shadcn/ui)
-
-**Layout:**
-```
-┌────────────────────────────────────────────────────────┐
-│  AI Tweet Generator                         [Dark Mode]│
-├────────────────────────────────────────────────────────┤
-│                                                        │
-│  ┌──────────────────────────────────────────────────┐ │
-│  │  What would you like to tweet about?             │ │
-│  │                                                  │ │
-│  │  [Large Textarea - User Prompt Input]           │ │
-│  │                                                  │ │
-│  └──────────────────────────────────────────────────┘ │
-│                                                        │
-│  [Generate Tweet Button]                               │
-│                                                        │
-│  ┌──────────────────────────────────────────────────┐ │
-│  │  Preview                                         │ │
-│  │  ┌────────────────────────────────────────────┐ │ │
-│  │  │ Generated tweet content appears here...    │ │ │
-│  │  │                                            │ │ │
-│  │  │ #Hashtag1 #Hashtag2                        │ │ │
-│  │  └────────────────────────────────────────────┘ │ │
-│  │                                                  │ │
-│  │  Character count: 145/280                        │ │
-│  │                                                  │ │
-│  │  [Regenerate] [Post to Twitter]                  │ │
-│  └──────────────────────────────────────────────────┘ │
-│                                                        │
-│  Recent Tweets                                         │
-│  ┌──────────────────────────────────────────────────┐ │
-│  │ • Tweet 1 - [View on Twitter]                    │ │
-│  │ • Tweet 2 - [View on Twitter]                    │ │
-│  └──────────────────────────────────────────────────┘ │
-└────────────────────────────────────────────────────────┘
-```
-
-### 3. API Client (`lib/api.ts`)
-
-```typescript
-export const api = {
-  async generateTweet(prompt: string) {
-    const response = await fetch('/api/proxy/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt })
-    });
-    return response.json();
-  },
-  
-  async postTweet(content: string, prompt: string) {
-    const response = await fetch('/api/proxy/post', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content, user_prompt: prompt })
-    });
-    return response.json();
-  },
-  
-  async getHistory() {
-    const response = await fetch('/api/proxy/history');
-    return response.json();
-  }
-};
+Response:
+{
+  "success": true,
+  "message": "Twitter account disconnected"
+}
 ```
 
 ---
 
 ## Environment Variables
 
-### Backend (`.env`)
+### Backend (.env)
 ```bash
-# Google Gemini
-GEMINI_API_KEY=your_gemini_api_key_here
+# Supabase
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_KEY=your_service_role_key
+SUPABASE_JWT_SECRET=your_jwt_secret
 
-# Twitter API (Free Tier)
-TWITTER_API_KEY=your_twitter_api_key
-TWITTER_API_SECRET=your_twitter_api_secret
-TWITTER_ACCESS_TOKEN=your_twitter_access_token
-TWITTER_ACCESS_TOKEN_SECRET=your_twitter_access_token_secret
+# Google Gemini
+GEMINI_API_KEY=your_gemini_api_key
+
+# Twitter OAuth 2.0
+TWITTER_CLIENT_ID=your_twitter_client_id
+TWITTER_CLIENT_SECRET=your_twitter_client_secret
+TWITTER_REDIRECT_URI=http://localhost:3000/api/auth/twitter/callback
+
+# LinkedIn OAuth 2.0 (Phase 2)
+LINKEDIN_CLIENT_ID=your_linkedin_client_id
+LINKEDIN_CLIENT_SECRET=your_linkedin_client_secret
+LINKEDIN_REDIRECT_URI=http://localhost:3000/api/auth/linkedin/callback
+
+# Reddit OAuth 2.0 (Phase 3)
+REDDIT_CLIENT_ID=your_reddit_client_id
+REDDIT_CLIENT_SECRET=your_reddit_client_secret
+REDDIT_REDIRECT_URI=http://localhost:3000/api/auth/reddit/callback
 
 # API Configuration
-CORS_ORIGINS=http://localhost:3000,https://your-frontend.vercel.app
+CORS_ORIGINS=http://localhost:3000
 PORT=8000
+FRONTEND_URL=http://localhost:3000
 ```
 
-### Frontend (`.env.local`)
+### Frontend (.env.local)
 ```bash
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_public_key
+
+# Backend API
 NEXT_PUBLIC_API_URL=http://localhost:8000
-# For production: https://your-backend.render.com
+
+# App URL
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
 ---
 
-## Dependencies
+## Dependencies Updates
 
-### Backend (`requirements.txt`)
+### Backend (requirements.txt)
 ```txt
+# FastAPI and Server
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 python-dotenv==1.0.0
 pydantic==2.5.0
 pydantic-settings==2.1.0
 
-# AI & Agent
-google-generativeai==0.3.1
+# AI & Agent Framework
+google-genai
 langchain==0.1.0
 langchain-google-genai==0.0.5
 langgraph==0.0.20
 
-# Twitter
-tweepy==4.14.0
+# Social Media APIs
+tweepy==4.14.0              # Twitter API
+httpx==0.25.2               # For OAuth flows
+
+# Database
+supabase==2.3.0             # Supabase Python client
+gotrue==1.3.0               # Supabase auth
 
 # Utilities
 python-multipart==0.0.6
 aiofiles==23.2.1
+python-jose[cryptography]    # JWT handling
 ```
 
-### Frontend (`package.json`)
+### Frontend (package.json)
 ```json
 {
   "dependencies": {
     "next": "14.0.4",
-    "react": "18.2.0",
-    "react-dom": "18.2.0",
-    "tailwindcss": "3.3.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "@supabase/supabase-js": "^2.39.0",
+    "@supabase/auth-helpers-nextjs": "^0.8.7",
+    "@tanstack/react-query": "^5.0.0",
+    "@tanstack/react-query-devtools": "^5.0.0",
     "@radix-ui/react-slot": "^1.0.2",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
     "lucide-react": "^0.294.0",
-    "tailwind-merge": "^2.1.0"
+    "tailwind-merge": "^2.1.0",
+    "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
-    "@types/node": "20.10.0",
-    "@types/react": "18.2.42",
-    "typescript": "5.3.2",
-    "autoprefixer": "10.4.16",
-    "postcss": "8.4.32"
+    "@types/node": "^20.10.0",
+    "@types/react": "^18.2.42",
+    "@types/react-dom": "^18.2.17",
+    "typescript": "^5.3.2",
+    "autoprefixer": "^10.4.16",
+    "eslint": "^8.55.0",
+    "eslint-config-next": "14.0.4",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.3.0"
   }
 }
 ```
 
 ---
 
-## Implementation Order
+## Security Considerations
 
-### Phase 1: Backend Foundation (Day 1)
-1. ✅ Set up project structure
-2. ✅ Install dependencies
-3. ✅ Configure environment variables
-4. ✅ Create FastAPI app skeleton
-5. ✅ Test basic endpoint
+### 1. **Row Level Security (RLS)**
+All tables have RLS enabled. Users can only:
+- ✅ View their own data
+- ✅ Insert their own data
+- ✅ Update their own data
+- ✅ Delete their own data
 
-### Phase 2: Services Integration (Day 1-2)
-1. ✅ Implement Gemini service
-2. ✅ Test Gemini API connection
-3. ✅ Implement Twitter service
-4. ✅ Test Twitter API (read-only first)
-5. ✅ Implement JSON storage
+### 2. **Token Storage**
+- ❌ Never store tokens in frontend/localStorage
+- ✅ Store encrypted in Supabase (server-side)
+- ✅ Refresh tokens automatically
+- ✅ Implement token expiry checks
 
-### Phase 3: Agent Development (Day 2-3)
-1. ✅ Define agent state schema
-2. ✅ Create agent nodes
-3. ✅ Build state graph
-4. ✅ Implement tools
-5. ✅ Test agent flow locally
+### 3. **API Authentication**
+```python
+# backend/auth/dependencies.py
 
-### Phase 4: API Endpoints (Day 3)
-1. ✅ Implement /generate endpoint
-2. ✅ Implement /post endpoint
-3. ✅ Implement /history endpoint
-4. ✅ Add error handling
-5. ✅ Test all endpoints
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    """Verify Supabase JWT token from frontend"""
+    try:
+        payload = jwt.decode(
+            token,
+            SUPABASE_JWT_SECRET,
+            algorithms=["HS256"]
+        )
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(401, "Invalid token")
+        return user_id
+    except:
+        raise HTTPException(401, "Invalid token")
 
-### Phase 5: Frontend Setup (Day 4)
-1. ✅ Initialize Next.js project
-2. ✅ Set up Tailwind CSS
-3. ✅ Install shadcn/ui
-4. ✅ Create component structure
-5. ✅ Set up API proxy
+# Usage in endpoints
+@app.post("/api/post")
+async def post_content(
+    request: PostRequest,
+    user_id: str = Depends(get_current_user)
+):
+    # user_id is verified from Supabase JWT
+    pass
+```
 
-### Phase 6: Frontend Implementation (Day 4-5)
-1. ✅ Build TweetGenerator component
-2. ✅ Build TweetPreview component
-3. ✅ Build TweetHistory component
-4. ✅ Implement API client
-5. ✅ Add loading states and error handling
+### 4. **OAuth State Parameter**
+- ✅ Generate random state for each OAuth flow
+- ✅ Store in session/cookie
+- ✅ Verify on callback
 
-### Phase 7: Integration & Testing (Day 5-6)
-1. ✅ Connect frontend to backend
-2. ✅ Test full flow end-to-end
-3. ✅ Fix bugs and edge cases
-4. ✅ Improve UX/UI
-5. ✅ Add final touches
-
-### Phase 8: Deployment (Day 6-7)
-1. ✅ Deploy backend to Render
-2. ✅ Deploy frontend to Vercel
-3. ✅ Update environment variables
-4. ✅ Test production deployment
-5. ✅ Monitor and debug
-
----
-
-## Deployment Guide
-
-### Backend Deployment (Render)
-
-**Steps:**
-1. Push code to GitHub repository
-2. Create new Web Service on Render
-3. Connect GitHub repo
-4. Configure:
-   - **Build Command:** `pip install -r backend/requirements.txt`
-   - **Start Command:** `cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT`
-   - **Environment:** Python 3
-5. Add environment variables in Render dashboard
-6. Deploy!
-
-**Free Tier Limits:**
-- Spins down after 15 minutes of inactivity
-- Cold start: ~30 seconds
-- 750 hours/month free
-
-### Frontend Deployment (Vercel)
-
-**Steps:**
-1. Push code to GitHub repository
-2. Import project in Vercel
-3. Configure:
-   - **Framework Preset:** Next.js
-   - **Root Directory:** `frontend`
-   - **Build Command:** `npm run build`
-4. Add environment variable: `NEXT_PUBLIC_API_URL`
-5. Deploy!
-
-**Free Tier Limits:**
-- Unlimited bandwidth
-- 100 GB-hours/month
-- Instant deployments
-
----
-
-## API Keys Setup Guide
-
-### 1. Google Gemini API Key
-
-1. Go to: https://makersuite.google.com/app/apikey
-2. Click "Create API Key"
-3. Copy the key
-4. Add to backend `.env`: `GEMINI_API_KEY=your_key`
-
-**Free Tier:**
-- 60 requests per minute
-- Sufficient for this project
-
-### 2. Twitter API Keys (Free Tier)
-
-1. Go to: https://developer.twitter.com/
-2. Sign in and create a new project
-3. Create an app in the project
-4. Generate keys:
-   - API Key
-   - API Secret
-   - Access Token
-   - Access Token Secret
-5. Set permissions to "Read and Write"
-6. Add to backend `.env`
-
-**Free Tier Limits:**
-- 1,500 tweets per month
-- 50 tweets per 24 hours
-- Rate limited
+### 5. **CORS Configuration**
+```python
+# Only allow requests from frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[FRONTEND_URL],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+```
 
 ---
 
 ## Testing Strategy
 
-### Backend Tests
-```bash
-# Test Gemini connection
-python -c "from services.gemini_service import GeminiService; ..."
+### Phase 1 Testing
+1. ✅ Test Supabase auth (client-side signup, login, logout)
+2. ✅ Test React Query state management
+3. ✅ Test Twitter OAuth flow
+4. ✅ Test content generation for Twitter
+5. ✅ Test posting to Twitter (with user's token)
+6. ✅ Test post history retrieval with caching
+7. ✅ Test RLS policies (try accessing other user's data)
 
-# Test Twitter connection (read-only)
-python -c "from services.twitter_service import TwitterService; ..."
-
-# Test agent flow
-python -c "from agent.graph import run_agent; ..."
-
-# Test API endpoints
-curl -X POST http://localhost:8000/api/generate \
-  -H "Content-Type: application/json" \
-  -d '{"prompt": "Test tweet about AI"}'
+### Test User Flow
 ```
-
-### Frontend Tests
-```bash
-# Run development server
-npm run dev
-
-# Test in browser
-# 1. Enter prompt
-# 2. Click generate
-# 3. Verify preview
-# 4. Click post (test mode)
+1. Sign up → Create account (client-side)
+2. Login → Get session (React Query)
+3. Connect Twitter → OAuth flow
+4. Generate content → AI creates tweet (React Query mutation)
+5. Preview → See content (cached)
+6. Post → Publish to Twitter (optimistic updates)
+7. View history → See past posts (React Query + real-time)
+8. Disconnect → Remove Twitter connection (optimistic updates)
+9. Logout → End session (clear all cache)
 ```
 
 ---
 
-## Learning Resources
+## Deployment Guide
 
-### Python for Node.js Developers
-- FastAPI docs: https://fastapi.tiangolo.com/
-- Python async/await: Similar to Node.js
-- Type hints: Similar to TypeScript
+### Backend (Render)
+```bash
+# Build Command
+pip install -r backend/requirements.txt
 
-### LangGraph & Agentic AI
-- LangGraph docs: https://langchain-ai.github.io/langgraph/
-- LangChain docs: https://python.langchain.com/
-- Agent concepts: ReAct pattern, tool calling
+# Start Command
+cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
 
-### Twitter API
-- Twitter API docs: https://developer.twitter.com/en/docs/twitter-api
-- Tweepy docs: https://docs.tweepy.org/
+# Environment Variables (add in Render dashboard)
+- SUPABASE_URL
+- SUPABASE_SERVICE_KEY
+- SUPABASE_JWT_SECRET
+- GEMINI_API_KEY
+- TWITTER_CLIENT_ID
+- TWITTER_CLIENT_SECRET
+- TWITTER_REDIRECT_URI (update to production URL)
+- FRONTEND_URL (update to Vercel URL)
+```
+
+### Frontend (Vercel)
+```bash
+# Framework Preset: Next.js
+# Root Directory: frontend
+# Build Command: npm run build
+
+# Environment Variables (add in Vercel dashboard)
+- NEXT_PUBLIC_SUPABASE_URL
+- NEXT_PUBLIC_SUPABASE_ANON_KEY
+- NEXT_PUBLIC_API_URL (Render backend URL)
+- NEXT_PUBLIC_APP_URL (Vercel URL)
+```
+
+### Supabase
+1. Create project at https://supabase.com
+2. Run SQL scripts to create tables
+3. Configure auth settings
+4. Add production URLs to allowed domains
+
+### Twitter Developer Portal
+1. Update Callback URLs to production
+2. Add Vercel URL to Website URL
+3. Verify OAuth 2.0 settings
+
+---
+
+## Migration from Current Version
+
+### What Changes
+- ❌ Remove: `backend/.env` Twitter credentials (now per-user)
+- ❌ Remove: `backend/data/tweets_history.json` (now in Supabase)
+- ❌ Remove: `backend/services/twitter_service.py` (OAuth 1.0a)
+- ❌ Remove: `/api/auth/login`, `/api/auth/signup` routes (client-side auth)
+- ✅ Add: Supabase integration
+- ✅ Add: OAuth 2.0 flows
+- ✅ Add: Multi-user support
+- ✅ Add: React Query state management
+- ✅ Add: Client-side authentication
+- ✅ Update: Agent to handle platform-specific generation
+
+### What Stays the Same
+- ✅ Core agent logic (LangGraph)
+- ✅ Gemini integration
+- ✅ Frontend UI components (update for auth + React Query)
+- ✅ FastAPI structure
+
+---
+
+## Success Metrics
+
+### Phase 1 Complete When:
+- ✅ Users can sign up/login (client-side with Supabase)
+- ✅ React Query manages all state (auth, connections, posts)
+- ✅ Users can connect Twitter via OAuth 2.0
+- ✅ Users can generate Twitter content (with React Query mutations)
+- ✅ Users can post to their Twitter (with optimistic updates)
+- ✅ Users can view their post history (with caching + real-time)
+- ✅ Multi-user works (User A can't see User B's data)
+
+### Phase 2 Complete When:
+- ✅ All Phase 1 features
+- ✅ Users can connect LinkedIn
+- ✅ Platform selector shows Twitter + LinkedIn
+- ✅ Content generation works for LinkedIn (longer, professional)
+- ✅ Posting to LinkedIn works
+
+### Phase 3 Complete When:
+- ✅ All Phase 1 & 2 features
+- ✅ Users can connect Reddit
+- ✅ Platform selector shows all 3 platforms
+- ✅ Content generation for Reddit (title + body)
+- ✅ Posting to Reddit works
+
+---
+
+## Learning Objectives
+
+By completing this project, you'll learn:
+
+### Backend
+- ✅ FastAPI with JWT verification middleware
+- ✅ OAuth 2.0 flow implementation
+- ✅ Supabase Python client
+- ✅ JWT token verification from frontend
+- ✅ LangGraph agent with conditional routing
+- ✅ Platform-specific tool creation
+
+### Frontend
+- ✅ Next.js 14 App Router
+- ✅ Supabase client-side authentication
+- ✅ React Query state management
+- ✅ Protected routes & middleware
+- ✅ OAuth callback handling
+- ✅ Optimistic updates & caching
+
+### Database
+- ✅ PostgreSQL schema design
+- ✅ Row Level Security (RLS)
+- ✅ Database relationships
+- ✅ Indexes for performance
+
+### Architecture
+- ✅ Multi-user SaaS patterns
+- ✅ OAuth integration patterns
+- ✅ Hybrid Next.js + Python architecture
+- ✅ Secure token storage
 
 ---
 
@@ -710,98 +1045,87 @@ npm run dev
 
 ### Common Issues
 
-**Backend:**
-- Virtual environment not activated → `source venv/bin/activate`
-- Module not found → `pip install -r requirements.txt`
-- API key errors → Check `.env` file
-- CORS errors → Update `CORS_ORIGINS` in backend
+**Supabase Connection:**
+- Check URL and keys in .env
+- Verify RLS policies are correct
+- Check browser network tab for errors
 
-**Frontend:**
-- API connection failed → Check `NEXT_PUBLIC_API_URL`
-- shadcn/ui components missing → `npx shadcn-ui@latest add button`
-- Build errors → Check TypeScript types
+**OAuth Callback:**
+- Ensure redirect URIs match exactly
+- Check state parameter validation
+- Verify OAuth app permissions
 
-**Deployment:**
-- Render: Check build logs, verify Python version
-- Vercel: Check environment variables, build settings
+**Token Refresh:**
+- Implement token refresh before expiry
+- Handle refresh token rotation
+- Store new tokens in database
 
----
-
-## Future Enhancements (Optional)
-
-1. **Advanced Agent Features:**
-   - Multi-tweet threads
-   - Image generation (DALL-E/Midjourney)
-   - Sentiment analysis before posting
-   - A/B testing different versions
-
-2. **Better Storage:**
-   - PostgreSQL database (Supabase free tier)
-   - User authentication
-   - Multiple user support
-
-3. **Scheduling:**
-   - Queue system for scheduled posts
-   - Best time to post suggestions
-
-4. **Analytics:**
-   - Track engagement metrics
-   - Show which prompts work best
-
-5. **More Platforms:**
-   - LinkedIn integration
-   - Threads (Meta)
-   - Bluesky
+**CORS Errors:**
+- Update CORS_ORIGINS in backend
+- Add Vercel URL to allowed origins
+- Check credentials flag
 
 ---
 
-## Success Metrics
+## Next Steps After Phase 3
 
-**You'll know it's working when:**
-- ✅ You can enter a prompt
-- ✅ Agent generates a tweet (with hashtags)
-- ✅ Preview shows correctly
-- ✅ Clicking "Post" successfully tweets
-- ✅ Tweet appears in history
-- ✅ You can see it on Twitter
+### Potential Features:
+1. **Analytics Dashboard**
+   - Track post performance
+   - Engagement metrics
+   - Best posting times
 
-**Learning Goals Achieved:**
-- ✅ Understand Python async/await
-- ✅ Build with FastAPI
-- ✅ Implement agentic AI with LangGraph
-- ✅ Tool calling patterns
-- ✅ LLM orchestration
-- ✅ API integration (Gemini + Twitter)
-- ✅ Full-stack deployment
+2. **Scheduled Posts**
+   - Queue system
+   - Cron jobs
+   - Time zone handling
 
----
+3. **Cross-Posting**
+   - Post to multiple platforms at once
+   - Platform-specific variations
 
-## Timeline Estimate
+4. **Team Collaboration**
+   - Multiple users per account
+   - Approval workflows
 
-- **Backend:** 2-3 days
-- **Frontend:** 2 days
-- **Integration:** 1 day
-- **Deployment:** 1 day
-- **Total:** ~6-7 days (at learning pace)
-
-If you focus and work efficiently: **3-4 days possible**
+5. **AI Improvements**
+   - Learn from past successful posts
+   - A/B testing content variations
+   - Sentiment analysis
 
 ---
 
-## Next Steps
+## Timeline
 
-1. ✅ Review this plan
-2. ✅ Ask any questions
-3. ✅ Get API keys ready (Gemini + Twitter)
-4. ✅ Start implementation (backend first)
-5. ✅ Build, test, deploy!
+**Week 1:**
+- Day 1: Supabase setup + Auth ✅
+- Day 2: Twitter OAuth 2.0 ✅
+- Day 3: Multi-user agent ✅
+
+**Week 2:**
+- Day 4-5: LinkedIn integration ✅
+- Day 6-7: Testing & bug fixes ✅
+
+**Week 3:**
+- Day 8-9: Reddit integration ✅
+- Day 10: Polish & deployment ✅
 
 ---
 
-**Ready to build? Let's start with the backend! 🚀**
+## Resources
+
+### Documentation
+- [Supabase Auth Docs](https://supabase.com/docs/guides/auth)
+- [Supabase RLS Guide](https://supabase.com/docs/guides/auth/row-level-security)
+- [Twitter OAuth 2.0](https://developer.twitter.com/en/docs/authentication/oauth-2-0)
+- [LinkedIn OAuth](https://learn.microsoft.com/en-us/linkedin/shared/authentication/authentication)
+- [Reddit OAuth](https://github.com/reddit-archive/reddit/wiki/OAuth2)
+- [LangGraph Documentation](https://langchain-ai.github.io/langgraph/)
+- [Next.js App Router](https://nextjs.org/docs/app)
 
 ---
 
-*Last Updated: October 17, 2025*
-*Version: 1.0*
-
+**Branch:** `feat/oauth`  
+**Status:** Ready to implement  
+**Last Updated:** October 17, 2025  
+**Version:** 2.0 (OAuth Multi-Platform)

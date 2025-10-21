@@ -2,7 +2,7 @@ import os
 import asyncio
 from google import genai
 from typing import List
-from prompts.templates import TWEET_GENERATION_PROMPT, HASHTAG_GENERATION_PROMPT
+from prompts.templates import TWEET_GENERATION_PROMPT, HASHTAG_GENERATION_PROMPT, get_platform_prompt
 
 
 class GeminiService:
@@ -17,18 +17,21 @@ class GeminiService:
         self.client = genai.Client()
         self.model_name = "gemini-2.0-flash-exp"
     
-    async def generate_tweet(self, user_prompt: str) -> str:
+    async def generate_tweet(self, user_prompt: str, platform: str = "twitter") -> str:
         """
-        Generate tweet content based on user prompt.
+        Generate content based on user prompt and platform.
         
         Args:
             user_prompt: The user's input prompt
+            platform: Target platform (twitter, linkedin, reddit)
             
         Returns:
-            Generated tweet content (without hashtags)
+            Generated content (without hashtags)
         """
         try:
-            prompt = TWEET_GENERATION_PROMPT.format(user_prompt=user_prompt)
+            # Use platform-specific prompt
+            prompt = get_platform_prompt(platform, "generation", user_prompt=user_prompt)
+            
             # Run sync operation in thread pool
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
@@ -40,30 +43,40 @@ class GeminiService:
             )
             
             # Extract text from response
-            tweet_content = response.text.strip()
+            content = response.text.strip()
             
-            # Ensure it's not too long (max 250 chars to leave room for hashtags)
-            if len(tweet_content) > 250:
-                tweet_content = tweet_content[:247] + "..."
+            # Platform-specific length limits
+            max_length = 250 if platform == "twitter" else 1300 if platform == "linkedin" else 10000
             
-            return tweet_content
+            # Ensure it's not too long
+            if len(content) > max_length:
+                content = content[:max_length - 3] + "..."
+            
+            return content
         
         except Exception as e:
-            print(f"Error generating tweet: {str(e)}")
-            raise Exception(f"Failed to generate tweet: {str(e)}")
+            print(f"Error generating content: {str(e)}")
+            raise Exception(f"Failed to generate content: {str(e)}")
     
-    async def generate_hashtags(self, tweet_content: str) -> List[str]:
+    async def generate_hashtags(self, content: str, platform: str = "twitter") -> List[str]:
         """
-        Generate relevant hashtags for the tweet content.
+        Generate relevant hashtags for the content.
         
         Args:
-            tweet_content: The generated tweet content
+            content: The generated content
+            platform: Target platform (twitter, linkedin, reddit)
             
         Returns:
             List of hashtags (e.g., ['#AI', '#Tech'])
         """
         try:
-            prompt = HASHTAG_GENERATION_PROMPT.format(tweet_content=tweet_content)
+            # Reddit doesn't use hashtags
+            if platform == "reddit":
+                return []
+            
+            # Use platform-specific prompt
+            prompt = get_platform_prompt(platform, "hashtags", content=content)
+            
             # Run sync operation in thread pool
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
@@ -83,8 +96,11 @@ class GeminiService:
                 if word.startswith('#'):
                     hashtags.append(word)
             
-            # Return max 3 hashtags
-            return hashtags[:3]
+            # Platform-specific hashtag limits
+            max_hashtags = 3 if platform == "twitter" else 5
+            
+            # Return limited hashtags
+            return hashtags[:max_hashtags]
         
         except Exception as e:
             print(f"Error generating hashtags: {str(e)}")
