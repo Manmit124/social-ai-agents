@@ -14,6 +14,11 @@ langgraph==0.0.20
 # Twitter Integration
 tweepy==4.14.0
 
+# Database & Auth
+supabase==2.3.0
+gotrue==1.3.0
+python-jose[cryptography]
+
 # Utilities
 python-multipart==0.0.6
 aiofiles==23.2.1
