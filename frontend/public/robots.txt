@@ -1,0 +1,15 @@
+# Mataru.ai - Robots.txt
+
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /dashboard/
+Disallow: /settings/
+Disallow: /history/
+
+# Sitemap
+Sitemap: https://mataru.ai/sitemap.xml
+
+# Crawl-delay
+Crawl-delay: 1
+
