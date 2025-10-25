@@ -1,14 +1,16 @@
-# AI Agents Tweet
+# Mataru.ai
 
-An agentic AI application that generates tweet content from prompts using Google Gemini and posts to Twitter.
+An AI-powered social media content generator that creates engaging posts using agentic AI workflows. Generate and publish content across multiple platforms with intelligent automation.
 
 ## Features
 
 - 🤖 **Agentic AI**: LangGraph-based agent with multi-step workflow
-- ✍️ **Content Generation**: Gemini Pro for creative tweet content
+- ✍️ **Content Generation**: Gemini Pro for creative social media content
 - 🏷️ **Smart Hashtags**: Automatic hashtag generation
-- 🐦 **Twitter Integration**: Direct posting to Twitter
-- 📊 **Tweet History**: JSON-based storage of generated tweets
+- 🔐 **OAuth 2.0**: Secure Twitter authentication with PKCE
+- 🐦 **Multi-Platform**: Twitter, LinkedIn, Reddit support (expanding)
+- 📊 **Post History**: Track all your published content
+- 👤 **User Authentication**: Supabase-powered auth system
 - 🎨 **Modern UI**: Next.js with Tailwind CSS and shadcn/ui
 
 ## Tech Stack

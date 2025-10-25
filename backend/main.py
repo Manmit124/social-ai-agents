@@ -28,8 +28,8 @@ from services.supabase_service import supabase_service
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="AI Agents Tweet API",
-    description="Agentic AI for generating and posting tweets",
+    title="Mataru.ai API",
+    description="AI-powered social media content generator with agentic workflows",
     version="1.0.0"
 )
 
@@ -56,7 +56,7 @@ oauth_states = {}
 async def root():
     """Root endpoint."""
     return {
-        "message": "AI Agents Tweet API",
+        "message": "Mataru.ai API",
         "version": "1.0.0",
         "status": "running"
     }
