@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/auth/useAuth";
 import { cn } from "@/lib/utils";
+import Logo from "@/components/logo/logo";
 import { 
   MessageSquare, 
   PlusCircle, 
@@ -27,11 +28,11 @@ export function Sidebar() {
   return (
     <div className="flex h-screen w-20 flex-col items-center border-r bg-sidebar py-6">
       {/* Logo */}
-      <div className="mb-8">
-        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary shadow-lg">
-          <Twitter className="h-6 w-6 text-primary-foreground" />
+      <Link href="/dashboard" className="mb-8">
+        <div className="flex items-center justify-center hover:opacity-80 transition-opacity">
+          <Logo  />
         </div>
-      </div>
+      </Link>
 
       {/* Navigation */}
       <nav className="flex flex-1 flex-col items-center space-y-4">

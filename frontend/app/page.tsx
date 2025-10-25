@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/auth/useAuth";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import Logo from "@/components/logo/logo";
 
 export default function Home() {
   const router = useRouter();
@@ -32,20 +33,23 @@ export default function Home() {
     <main className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="mb-8 text-center">
+          <div className="flex justify-center mb-4">
+            <Logo className="w-24 h-24" />
+          </div>
           <h1 className="text-4xl font-bold mb-2 text-foreground">
-            AI Tweet Generator
+            Mataru.ai
           </h1>
           <p className="text-muted-foreground">
-            Powered by Gemini & LangGraph
+            AI-Powered Social Media Content Generator
           </p>
         </div>
         
         <div className="grid gap-6 md:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle>Welcome to AI Agents Tweet</CardTitle>
+              <CardTitle>Welcome to Mataru.ai</CardTitle>
               <CardDescription>
-                Generate and post tweets using AI agents with multi-platform support
+                Generate and post engaging content using AI agents with multi-platform support
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
