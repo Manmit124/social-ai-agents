@@ -268,9 +268,10 @@ class TwitterOAuthService:
             expires_in: Seconds until expiration
             
         Returns:
-            datetime: Expiration time
+            datetime: Expiration time (timezone-aware UTC)
         """
-        return datetime.utcnow() + timedelta(seconds=expires_in)
+        from datetime import timezone
+        return datetime.now(timezone.utc) + timedelta(seconds=expires_in)
     
     def is_token_expired(self, expires_at: datetime) -> bool:
         """
@@ -282,6 +283,15 @@ class TwitterOAuthService:
         Returns:
             bool: True if expired
         """
+        from datetime import timezone
+        
+        # Ensure both datetimes are timezone-aware
+        now = datetime.now(timezone.utc)
+        
+        # If expires_at is naive, assume UTC
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        
         # Add 5 minute buffer
-        return datetime.utcnow() >= (expires_at - timedelta(minutes=5))
+        return now >= (expires_at - timedelta(minutes=5))
 

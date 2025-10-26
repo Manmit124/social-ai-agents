@@ -118,6 +118,32 @@ class SupabaseService:
             logger.error(f"Error deleting connected account: {e}")
             return False
     
+    def update_platform_tokens(self, user_id: str, platform: str, access_token: str, refresh_token: str, expires_at: Any) -> bool:
+        """
+        Update access and refresh tokens for a connected account
+        """
+        try:
+            from datetime import datetime
+            
+            # Convert datetime to ISO string if needed
+            if isinstance(expires_at, datetime):
+                expires_at_str = expires_at.isoformat()
+            else:
+                expires_at_str = expires_at
+            
+            update_data = {
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "expires_at": expires_at_str,
+                "is_active": True
+            }
+            
+            response = self.client.table("connected_accounts").update(update_data).eq("user_id", user_id).eq("platform", platform).execute()
+            return True
+        except Exception as e:
+            logger.error(f"Error updating platform tokens: {e}")
+            return False
+    
     def save_post(self, post_data: Dict[str, Any]) -> Optional[str]:
         """
         Save post to database

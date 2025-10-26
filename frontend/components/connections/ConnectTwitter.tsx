@@ -1,8 +1,8 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Twitter } from "lucide-react";
 import { useConnections } from "@/hooks/api/useConnections";
+import { XIcon } from "@/components/icons/XIcon";
 
 export function ConnectTwitter() {
   const { connectTwitter, isConnected } = useConnections();
@@ -23,8 +23,8 @@ export function ConnectTwitter() {
       disabled={connectTwitter.isPending}
       className="w-full"
     >
-      <Twitter className="mr-2 h-4 w-4" />
-      {connectTwitter.isPending ? "Connecting..." : "Connect Twitter"}
+      <XIcon className="mr-2 h-4 w-4" />
+      {connectTwitter.isPending ? "Connecting..." : "Connect X"}
     </Button>
   );
 }

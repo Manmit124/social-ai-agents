@@ -10,10 +10,10 @@ export function JsonLd() {
       "price": "0",
       "priceCurrency": "USD"
     },
-    "description": "AI-powered social media content generator. Automate your Twitter, LinkedIn, and Reddit posts with intelligent AI agents powered by LangGraph and Google Gemini.",
+    "description": "AI-powered social media content generator. Automate your X, LinkedIn, and Reddit posts with intelligent AI agents powered by LangGraph and Google Gemini.",
     "featureList": [
       "AI-powered content generation",
-      "Multi-platform posting (Twitter, LinkedIn, Reddit)",
+      "Multi-platform posting (X, LinkedIn, Reddit)",
       "OAuth 2.0 integration",
       "Real-time content preview",
       "Post history tracking",

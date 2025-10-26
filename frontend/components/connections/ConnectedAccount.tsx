@@ -2,8 +2,9 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Twitter, CheckCircle2, XCircle } from "lucide-react";
+import { CheckCircle2, XCircle } from "lucide-react";
 import { useConnections, type Connection } from "@/hooks/api/useConnections";
+import { XIcon } from "@/components/icons/XIcon";
 
 interface ConnectedAccountProps {
   connection: Connection;
@@ -13,7 +14,8 @@ export function ConnectedAccount({ connection }: ConnectedAccountProps) {
   const { disconnectAccount } = useConnections();
 
   const handleDisconnect = () => {
-    if (confirm(`Are you sure you want to disconnect ${connection.platform}?`)) {
+    const platformName = connection.platform === "twitter" ? "X" : connection.platform;
+    if (confirm(`Are you sure you want to disconnect ${platformName}?`)) {
       disconnectAccount.mutate(connection.platform);
     }
   };
@@ -21,13 +23,14 @@ export function ConnectedAccount({ connection }: ConnectedAccountProps) {
   const getIcon = () => {
     switch (connection.platform) {
       case "twitter":
-        return <Twitter className="h-5 w-5" />;
+        return <XIcon className="h-5 w-5" />;
       default:
         return null;
     }
   };
 
   const getPlatformName = () => {
+    if (connection.platform === "twitter") return "X";
     return connection.platform.charAt(0).toUpperCase() + connection.platform.slice(1);
   };
 

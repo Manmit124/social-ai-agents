@@ -2,32 +2,27 @@
 
 import { useAuth } from "@/hooks/auth/useAuth";
 import { ContentGenerator } from "@/components/generator/ContentGenerator";
-import { PostHistory } from "@/components/history/PostHistory";
 
 export default function DashboardPage() {
   const { user } = useAuth();
 
   return (
-    <div className="flex h-full flex-col p-8">
-      <div className="mb-8">
-        <h1 className="mb-2 text-3xl font-bold text-foreground">
-          Welcome back{user?.email ? `, ${user.email.split('@')[0]}` : ''}!
-        </h1>
-        <p className="text-muted-foreground">
-          Generate engaging content for your social media platforms with AI
-        </p>
-      </div>
+    <div className="flex h-full flex-col items-center justify-center p-8">
+      {/* Centered Content Container */}
+      <div className="w-full max-w-3xl mx-auto space-y-12">
+        
+        {/* Hero Section - Minimal & Centered */}
+        <div className="text-center space-y-3">
+          <h1 className="text-5xl font-bold tracking-tight">
+            Just create with <span className="text-primary">AI</span>
+          </h1>
+          <p className="text-lg text-muted-foreground">
+            Generate engaging content for your social media platforms
+          </p>
+        </div>
 
-      <div className="grid flex-1 gap-6 lg:grid-cols-2">
         {/* Content Generator */}
-        <div className="flex flex-col">
-          <ContentGenerator />
-        </div>
-
-        {/* Post History */}
-        <div className="flex flex-col">
-          <PostHistory />
-        </div>
+        <ContentGenerator />
       </div>
     </div>
   );

@@ -12,11 +12,13 @@ import {
   Settings,
   LogOut,
   Twitter,
-  Sparkles
+  Sparkles,
+  Puzzle
 } from "lucide-react";
 
 const navigation = [
   { name: "Generate Tweet", href: "/dashboard", icon: Sparkles },
+  { name: "Apps", href: "/apps", icon: Puzzle },
   { name: "History", href: "/history", icon: History },
   { name: "Settings", href: "/settings", icon: Settings },
 ];

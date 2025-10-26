@@ -11,12 +11,12 @@ export const metadata: Metadata = {
     default: "Mataru.ai - AI-Powered Social Media Content Generator",
     template: "%s | Mataru.ai"
   },
-  description: "Generate and post engaging content across Twitter, LinkedIn, and Reddit using AI agents. Automate your social media with Mataru.ai - powered by LangGraph and Google Gemini.",
+  description: "Generate and post engaging content across X, LinkedIn, and Reddit using AI agents. Automate your social media with Mataru.ai - powered by LangGraph and Google Gemini.",
   keywords: [
     "AI social media generator",
     "automated content posting",
-    "Twitter content generator",
-    "AI tweet generator",
+    "X content generator",
+    "AI post generator",
     "social media automation",
     "LangGraph",
     "Google Gemini AI",
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: "/",
     title: "Mataru.ai - AI-Powered Social Media Content Generator",
-    description: "Generate and post engaging content across social media platforms using AI agents. Automate your Twitter, LinkedIn, and Reddit posts with intelligent AI.",
+    description: "Generate and post engaging content across social media platforms using AI agents. Automate your X, LinkedIn, and Reddit posts with intelligent AI.",
     siteName: "Mataru.ai",
     images: [
       {

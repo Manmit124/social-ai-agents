@@ -165,14 +165,64 @@ async def post_content(
                 detail=f"Your {request.platform} account is not active. Please reconnect."
             )
         
+        # Debug: Check what fields we have
+        print(f"📊 Account data fields: {list(account.keys())}")
+        print(f"📊 Has expires_at: {account.get('expires_at') is not None}")
+        print(f"📊 Has refresh_token: {account.get('refresh_token') is not None}")
+        
         # Post to platform using user's tokens
         result = None
         if request.platform == "twitter":
             # Use Twitter OAuth service with user's access token
             twitter_oauth = TwitterOAuthService()
+            
+            # Check if token is expired and refresh if needed
+            access_token = account["access_token"]
+            if account.get("expires_at"):
+                from datetime import datetime, timezone
+                
+                # Parse the expires_at timestamp
+                expires_at_str = account["expires_at"]
+                if isinstance(expires_at_str, str):
+                    # Handle ISO format with or without timezone
+                    if expires_at_str.endswith('Z'):
+                        expires_at_str = expires_at_str.replace('Z', '+00:00')
+                    expires_at = datetime.fromisoformat(expires_at_str)
+                    # Ensure it's timezone-aware
+                    if expires_at.tzinfo is None:
+                        expires_at = expires_at.replace(tzinfo=timezone.utc)
+                else:
+                    expires_at = expires_at_str
+                
+                if twitter_oauth.is_token_expired(expires_at):
+                    print(f"🔄 Token expired, refreshing for user {user_id}...")
+                    try:
+                        # Refresh the token
+                        token_response = await twitter_oauth.refresh_access_token(account["refresh_token"])
+                        
+                        # Update the access token
+                        access_token = token_response["access_token"]
+                        
+                        # Update tokens in database
+                        new_expires_at = twitter_oauth.calculate_token_expiry(token_response.get("expires_in", 7200))
+                        supabase_service.update_platform_tokens(
+                            user_id,
+                            request.platform,
+                            access_token,
+                            token_response.get("refresh_token", account["refresh_token"]),
+                            new_expires_at
+                        )
+                        print(f"✅ Token refreshed successfully for user {user_id}")
+                    except Exception as e:
+                        print(f"❌ Failed to refresh token: {str(e)}")
+                        raise HTTPException(
+                            status_code=401,
+                            detail="Your session has expired. Please reconnect your account."
+                        )
+            
             result = await twitter_oauth.post_tweet(
                 request.content,
-                account["access_token"]
+                access_token
             )
         elif request.platform == "linkedin":
             # LinkedIn posting will be implemented in Phase 2
@@ -349,7 +399,7 @@ async def twitter_callback(
             "platform_username": twitter_user["username"],
             "access_token": token_response["access_token"],
             "refresh_token": token_response.get("refresh_token"),
-            "token_expires_at": expires_at.isoformat(),
+            "expires_at": expires_at.isoformat(),  # Fixed: was token_expires_at
             "scope": token_response.get("scope", "").split(),
             "is_active": True
         }
