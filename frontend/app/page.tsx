@@ -57,7 +57,7 @@ export default function Home() {
                 <h3 className="font-semibold">Features:</h3>
                 <ul className="text-sm text-muted-foreground space-y-1">
                   <li>• AI-powered content generation</li>
-                  <li>• Multi-platform posting (Twitter, LinkedIn, Reddit)</li>
+                  <li>• Multi-platform posting (X, LinkedIn, Reddit)</li>
                   <li>• OAuth 2.0 integration</li>
                   <li>• Real-time content preview</li>
                   <li>• Post history tracking</li>
