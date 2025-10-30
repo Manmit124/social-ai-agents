@@ -41,7 +41,13 @@ ai-agents-tweet/
 │   ├── app/         # Pages
 │   ├── components/  # React components
 │   └── lib/         # API client
-└── PLAN.md          # Detailed implementation plan
+└── docs/            # Documentation
+    ├── BACKEND_DOCUMENTATION.md
+    ├── PLAN.md
+    ├── PYTHON_LEARNING_GUIDE.md
+    ├── SETUP.md
+    ├── TWITTER_OAUTH_SETUP.md
+    └── TWITTER_POST.md
 ```
 
 ## Setup Instructions
@@ -153,6 +159,17 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 3. Set root directory: `frontend`
 4. Add `NEXT_PUBLIC_API_URL` environment variable
 5. Deploy
+
+## Documentation
+
+For detailed documentation, see the `docs/` folder:
+
+- **[SETUP.md](docs/SETUP.md)** - Detailed setup instructions
+- **[BACKEND_DOCUMENTATION.md](docs/BACKEND_DOCUMENTATION.md)** - Backend architecture and API reference
+- **[PLAN.md](docs/PLAN.md)** - Project implementation plan
+- **[PYTHON_LEARNING_GUIDE.md](docs/PYTHON_LEARNING_GUIDE.md)** - Python learning resources
+- **[TWITTER_OAUTH_SETUP.md](docs/TWITTER_OAUTH_SETUP.md)** - Twitter OAuth configuration
+- **[TWITTER_POST.md](docs/TWITTER_POST.md)** - Twitter posting guide
 
 ## Learning Resources
 
