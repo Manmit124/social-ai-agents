@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Logo from "@/components/logo/logo";
+import { Sparkles, Zap, Shield, TrendingUp, ArrowRight, Twitter, Linkedin, MessageSquare } from "lucide-react";
 
 export default function Home() {
   const router = useRouter();
@@ -30,92 +31,135 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="mb-8 text-center">
-          <div className="flex justify-center mb-4">
-            <Logo className="w-24 h-24" />
-          </div>
-          <h1 className="text-4xl font-bold mb-2 text-foreground">
-            Mataru.ai
-          </h1>
-          <p className="text-muted-foreground">
-            AI-Powered Social Media Content Generator
-          </p>
-        </div>
-        
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Welcome to Mataru.ai</CardTitle>
-              <CardDescription>
-                Generate and post engaging content using AI agents with multi-platform support
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <h3 className="font-semibold">Features:</h3>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>• AI-powered content generation</li>
-                  <li>• Multi-platform posting (X, LinkedIn, Reddit)</li>
-                  <li>• OAuth 2.0 integration</li>
-                  <li>• Real-time content preview</li>
-                  <li>• Post history tracking</li>
-                </ul>
-              </div>
-              <div className="flex space-x-2">
-                <Button asChild>
-                  <Link href="/login">Sign In</Link>
-                </Button>
-                <Button variant="outline" asChild>
-                  <Link href="/signup">Sign Up</Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>How it works</CardTitle>
-              <CardDescription>
-                Simple steps to get started
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0 w-6 h-6 bg-primary/10 text-primary rounded-full flex items-center justify-center text-sm font-semibold">
-                    1
-                  </div>
-                  <div>
-                    <h4 className="font-medium">Connect your accounts</h4>
-                    <p className="text-sm text-muted-foreground">Link your social media accounts securely</p>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0 w-6 h-6 bg-primary/10 text-primary rounded-full flex items-center justify-center text-sm font-semibold">
-                    2
-                  </div>
-                  <div>
-                    <h4 className="font-medium">Generate content</h4>
-                    <p className="text-sm text-muted-foreground">AI creates platform-specific content</p>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0 w-6 h-6 bg-primary/10 text-primary rounded-full flex items-center justify-center text-sm font-semibold">
-                    3
-                  </div>
-                  <div>
-                    <h4 className="font-medium">Post & track</h4>
-                    <p className="text-sm text-muted-foreground">Publish and monitor your posts</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-background">
+      {/* Animated Background Elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-primary/20 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-primary/25 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        <div className="absolute top-1/2 left-1/2 w-[400px] h-[400px] bg-primary/15 rounded-full blur-3xl animate-pulse delay-2000"></div>
+        <div className="absolute top-3/4 left-1/3 w-[300px] h-[300px] bg-orange-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
       </div>
-    </main>
+
+      {/* Navigation */}
+      <nav className="relative z-10 border-b border-border backdrop-blur-sm bg-background/80">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-xl font-bold text-foreground">
+                Mataru
+              </span>
+            </div>
+            <div className="flex items-center gap-4">
+              <Link href="/login">
+                <Button variant="ghost">
+                  Sign In
+                </Button>
+              </Link>
+              <Link href="/signup">
+                <Button>
+                  Get Started
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {/* Hero Section */}
+      <section className="relative z-10 container mx-auto px-4 pt-20 pb-32">
+        <div className="text-center max-w-5xl mx-auto">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-8 animate-fade-in">
+            <Sparkles className="w-4 h-4 text-primary" />
+            <span className="text-sm text-primary">AI-Powered Social Media Automation</span>
+          </div>
+          
+          <h1 className="text-5xl md:text-7xl font-bold text-foreground mb-6 leading-tight animate-slide-up">
+            Transform Your Social Media
+            <span className="block text-primary mt-2">
+              With AI Agents
+            </span>
+          </h1>
+          
+          <p className="text-xl text-muted-foreground mb-10 max-w-3xl mx-auto animate-slide-up delay-100">
+            Generate engaging content and post across X, LinkedIn, and Reddit automatically. 
+            Let AI handle your social media while you focus on what matters.
+          </p>
+          
+          <div className="flex flex-wrap gap-4 justify-center animate-slide-up delay-200">
+            <Link href="/signup">
+              <Button size="lg" className="text-lg px-8 py-6 rounded-full shadow-lg hover-scale">
+                Start Free Trial
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </Link>
+            <Link href="/dashboard">
+              <Button size="lg" variant="outline" className="text-lg px-8 py-6 rounded-full hover-scale">
+                View Demo
+              </Button>
+            </Link>
+          </div>
+
+          {/* Social Platform Icons */}
+          <div className="flex items-center justify-center gap-8 mt-16 animate-fade-in delay-300">
+            <div className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+              <Twitter className="w-6 h-6" />
+              <span>X (Twitter)</span>
+            </div>
+            <div className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+              <Linkedin className="w-6 h-6" />
+              <span>LinkedIn</span>
+            </div>
+            <div className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+              <MessageSquare className="w-6 h-6" />
+              <span>Reddit</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      
+
+      <style jsx global>{`
+        @keyframes fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes slide-up {
+          from { 
+            opacity: 0;
+            transform: translateY(30px);
+          }
+          to { 
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fade-in {
+          animation: fade-in 1s ease-out;
+        }
+        .animate-slide-up {
+          animation: slide-up 0.8s ease-out;
+        }
+        .delay-100 {
+          animation-delay: 0.1s;
+          animation-fill-mode: both;
+        }
+        .delay-200 {
+          animation-delay: 0.2s;
+          animation-fill-mode: both;
+        }
+        .delay-300 {
+          animation-delay: 0.3s;
+          animation-fill-mode: both;
+        }
+        .delay-1000 {
+          animation-delay: 1s;
+        }
+        .delay-2000 {
+          animation-delay: 2s;
+        }
+      `}</style>
+    </div>
   );
 }
 
