@@ -80,8 +80,10 @@ export function useAuth() {
   const loginMutation = useMutation({
     mutationFn: ({ email, password }: { email: string; password: string }) => 
       loginUser(email, password),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['auth'] })
+    onSuccess: async () => {
+      // Invalidate and refetch auth data immediately
+      await queryClient.invalidateQueries({ queryKey: ['auth'] })
+      await queryClient.refetchQueries({ queryKey: ['auth'] })
       // Let the component handle navigation
     },
     onError: (error) => {

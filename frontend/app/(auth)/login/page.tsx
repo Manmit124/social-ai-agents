@@ -21,7 +21,12 @@ export default function LoginPage() {
 
     login({ email, password }, {
       onSuccess: () => {
-        router.push("/dashboard");
+        // Refresh the router to update the middleware session
+        router.refresh();
+        // Small delay to ensure session is updated
+        setTimeout(() => {
+          router.push("/dashboard");
+        }, 100);
       }
     });
   };
