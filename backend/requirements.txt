@@ -11,8 +11,8 @@ langchain==0.1.0
 langchain-google-genai==0.0.5
 langgraph==0.0.20
 
-# Twitter Integration
-tweepy==4.14.0
+# Twitter Integration (only for OAuth, not API v1.1)
+# tweepy not needed anymore - using httpx for OAuth 2.0
 
 # Database & Auth
 supabase==2.10.0
