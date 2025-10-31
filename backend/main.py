@@ -21,7 +21,6 @@ from models.schemas import (
 )
 from auth.supabase_auth import get_current_user
 from agent.graph import run_agent
-from services.twitter_service import TwitterService
 from storage.tweet_storage import TweetStorage
 from services.social.twitter_service import TwitterOAuthService
 from services.supabase_service import supabase_service
@@ -44,7 +43,6 @@ app.add_middleware(
 )
 
 # Initialize services
-twitter_service = TwitterService()
 tweet_storage = TweetStorage()
 twitter_oauth = TwitterOAuthService()
 
