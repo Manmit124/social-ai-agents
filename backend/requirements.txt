@@ -6,9 +6,9 @@ pydantic==2.9.2
 pydantic-settings==2.6.0
 
 # AI & Agent Framework
-google-generativeai==0.3.2
+google-genai==1.0.0
 langchain==0.1.0
-langchain-google-genai==0.0.5
+langchain-google-genai==2.0.5
 langgraph==0.0.20
 
 # Twitter Integration (only for OAuth, not API v1.1)

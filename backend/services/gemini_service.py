@@ -1,6 +1,6 @@
 import os
 import asyncio
-import google.generativeai as genai
+from google import genai
 from typing import List
 from prompts.templates import TWEET_GENERATION_PROMPT, HASHTAG_GENERATION_PROMPT, get_platform_prompt
 
@@ -12,9 +12,9 @@ class GeminiService:
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY not found in environment variables")
         
-        # Initialize the Gemini client
-        genai.configure(api_key=self.api_key)
-        self.model_name = "gemini-1.5-flash"
+        # Initialize the new Gemini client
+        self.client = genai.Client(api_key=self.api_key)
+        self.model_name = "gemini-2.0-flash-exp"
     
     async def generate_tweet(self, user_prompt: str, platform: str = "twitter") -> str:
         """
@@ -33,10 +33,12 @@ class GeminiService:
             
             # Run sync operation in thread pool
             loop = asyncio.get_event_loop()
-            model = genai.GenerativeModel(self.model_name)
             response = await loop.run_in_executor(
                 None,
-                lambda: model.generate_content(prompt)
+                lambda: self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=prompt
+                )
             )
             
             # Extract text from response
@@ -76,10 +78,12 @@ class GeminiService:
             
             # Run sync operation in thread pool
             loop = asyncio.get_event_loop()
-            model = genai.GenerativeModel(self.model_name)
             response = await loop.run_in_executor(
                 None,
-                lambda: model.generate_content(prompt)
+                lambda: self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=prompt
+                )
             )
             
             # Extract hashtags from response
