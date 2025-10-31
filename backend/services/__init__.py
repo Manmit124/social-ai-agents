@@ -1,4 +1,2 @@
 from .gemini_service import GeminiService
-from .twitter_service import TwitterService
-
-
+# TwitterService removed - using OAuth service in social/twitter_service.py instead
