@@ -25,6 +25,7 @@ from storage.tweet_storage import TweetStorage
 from services.social.twitter_service import TwitterOAuthService
 from services.social.github_service import GitHubOAuthService
 from services.supabase_service import supabase_service
+from services.github_data_service import GitHubDataService
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -47,6 +48,7 @@ app.add_middleware(
 tweet_storage = TweetStorage()
 twitter_oauth = TwitterOAuthService()
 github_oauth = GitHubOAuthService()
+github_data_service = GitHubDataService()
 
 # Store OAuth states temporarily (in production, use Redis or database)
 oauth_states = {}
@@ -597,6 +599,270 @@ async def disconnect_account(
         raise
     except Exception as e:
         print(f"❌ Error disconnecting account: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/github/fetch-data")
+async def fetch_github_data(
+    authorization: Optional[str] = Header(None),
+    days: int = 30
+):
+    """
+    Fetch GitHub commits and store in database.
+    
+    Args:
+        authorization: JWT token in Authorization header
+        days: Number of days to fetch (default: 30)
+        
+    Returns:
+        Success message with count of commits fetched
+    """
+    try:
+        # Verify user is authenticated
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        token = authorization.split(" ")[1]
+        user_data = supabase_service.verify_jwt_token(token)
+        user_id = user_data.get("sub")
+        
+        print(f"\n📦 User {user_id} - Fetching GitHub data...")
+        
+        # Get user's GitHub connection
+        github_account = supabase_service.get_platform_connection(user_id, "github")
+        
+        if not github_account:
+            raise HTTPException(
+                status_code=400,
+                detail="No GitHub account connected. Please connect your account first."
+            )
+        
+        if not github_account.get("is_active"):
+            raise HTTPException(
+                status_code=400,
+                detail="Your GitHub account is not active. Please reconnect."
+            )
+        
+        access_token = github_account["access_token"]
+        username = github_account["platform_username"]
+        
+        # Check if this is first fetch or refresh
+        last_fetch_info = await github_data_service.get_last_fetch_info(user_id)
+        fetch_type = "initial" if not last_fetch_info else "refresh"
+        
+        # Get last commit date for incremental fetch
+        since_date = None
+        if fetch_type == "refresh":
+            since_date = await github_data_service.get_last_commit_date(user_id)
+            print(f"📅 Last commit date: {since_date}")
+        
+        # Fetch commits from GitHub
+        print(f"🔄 Fetching commits from GitHub (last {days} days)...")
+        result = await github_oauth.batch_fetch_commits(
+            access_token=access_token,
+            username=username,
+            since_date=since_date,
+            days=days,
+            max_repos=20
+        )
+        
+        commits = result["commits"]
+        print(f"✅ Fetched {len(commits)} commits from {result['repositories_checked']} repositories")
+        
+        # Save commits to database
+        if commits:
+            print(f"💾 Saving commits to database...")
+            save_result = await github_data_service.save_github_commits(user_id, commits)
+            
+            new_commits = save_result["new_commits"]
+            skipped = save_result["skipped"]
+            
+            print(f"✅ Saved {new_commits} new commits (skipped {skipped} duplicates)")
+            
+            # Update fetch log
+            from datetime import datetime
+            last_commit_date = None
+            if commits:
+                last_commit_date_str = commits[0]["commit"]["author"]["date"]
+                last_commit_date = datetime.fromisoformat(last_commit_date_str.replace("Z", "+00:00"))
+            
+            await github_data_service.update_fetch_log(
+                user_id=user_id,
+                last_commit_date=last_commit_date,
+                total_count=new_commits,
+                fetch_type=fetch_type
+            )
+            
+            return {
+                "success": True,
+                "message": f"Fetched {new_commits} new commits from {result['repositories_checked']} repositories",
+                "data": {
+                    "new_commits": new_commits,
+                    "skipped_duplicates": skipped,
+                    "repositories_checked": result['repositories_checked'],
+                    "fetch_type": fetch_type
+                }
+            }
+        else:
+            return {
+                "success": True,
+                "message": "No new commits found",
+                "data": {
+                    "new_commits": 0,
+                    "skipped_duplicates": 0,
+                    "repositories_checked": result['repositories_checked'],
+                    "fetch_type": fetch_type
+                }
+            }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error fetching GitHub data: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/github/activity")
+async def get_github_activity(
+    authorization: Optional[str] = Header(None),
+    limit: int = 100,
+    days: Optional[int] = None
+):
+    """
+    Get user's stored GitHub activity.
+    
+    Args:
+        authorization: JWT token in Authorization header
+        limit: Maximum number of commits to return (default: 100)
+        days: Only return commits from last N days (optional)
+        
+    Returns:
+        List of commits from database
+    """
+    try:
+        # Verify user is authenticated
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        token = authorization.split(" ")[1]
+        user_data = supabase_service.verify_jwt_token(token)
+        user_id = user_data.get("sub")
+        
+        # Get activity from database
+        activity = await github_data_service.get_user_github_activity(
+            user_id=user_id,
+            limit=limit,
+            days=days
+        )
+        
+        # Get additional stats
+        total_commits = await github_data_service.get_commit_count(user_id)
+        repositories = await github_data_service.get_repositories(user_id)
+        last_fetch_info = await github_data_service.get_last_fetch_info(user_id)
+        
+        return {
+            "success": True,
+            "data": {
+                "commits": activity,
+                "total_commits": total_commits,
+                "repositories": repositories,
+                "last_fetch": last_fetch_info
+            }
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error getting GitHub activity: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/github/status")
+async def get_github_status(authorization: Optional[str] = Header(None)):
+    """
+    Get GitHub data freshness status with smart refresh recommendations.
+    
+    Args:
+        authorization: JWT token in Authorization header
+        
+    Returns:
+        Status information about GitHub data with refresh recommendations
+    """
+    try:
+        # Verify user is authenticated
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        token = authorization.split(" ")[1]
+        user_data = supabase_service.verify_jwt_token(token)
+        user_id = user_data.get("sub")
+        
+        # Get comprehensive refresh recommendation
+        recommendation = await github_data_service.get_refresh_recommendation(user_id)
+        
+        # Get repositories list
+        repositories = await github_data_service.get_repositories(user_id)
+        
+        return {
+            "success": True,
+            "data": {
+                "total_commits": recommendation["total_commits_stored"],
+                "last_fetch_time": recommendation["last_fetch_time"],
+                "last_commit_date": recommendation["last_commit_date"],
+                "needs_refresh": recommendation["should_refresh"],
+                "hours_since_fetch": recommendation["hours_since_fetch"],
+                "refresh_reason": recommendation["reason"],
+                "has_data": recommendation["has_data"],
+                "repositories_count": len(repositories),
+                "repositories": repositories
+            }
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error getting GitHub status: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/github/refresh-check")
+async def check_refresh_needed(
+    authorization: Optional[str] = Header(None),
+    hours_threshold: int = 24
+):
+    """
+    Check if GitHub data needs refresh based on custom threshold.
+    
+    Args:
+        authorization: JWT token in Authorization header
+        hours_threshold: Hours after which data is considered stale (default: 24)
+        
+    Returns:
+        Simple refresh check result
+    """
+    try:
+        # Verify user is authenticated
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        token = authorization.split(" ")[1]
+        user_data = supabase_service.verify_jwt_token(token)
+        user_id = user_data.get("sub")
+        
+        # Check if refresh is needed
+        refresh_check = await github_data_service.should_refresh_data(user_id, hours_threshold)
+        
+        return {
+            "success": True,
+            "data": refresh_check
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error checking refresh status: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
