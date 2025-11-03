@@ -13,12 +13,14 @@ import {
   LogOut,
   Twitter,
   Sparkles,
-  Puzzle
+  LayoutGrid,
+  Database
 } from "lucide-react";
 
 const navigation = [
   { name: "Generate Tweet", href: "/dashboard", icon: Sparkles },
-  { name: "Apps", href: "/apps", icon: Puzzle },
+  { name: "Apps", href: "/apps", icon: LayoutGrid },
+  { name: "Data Sources", href: "/data", icon: Database },
   { name: "History", href: "/history", icon: History },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
@@ -39,7 +41,7 @@ export function Sidebar() {
       {/* Navigation */}
       <nav className="flex flex-1 flex-col items-center space-y-4">
         {navigation.map((item) => {
-          const isActive = pathname === item.href;
+          const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
           return (
             <Link
               key={item.name}

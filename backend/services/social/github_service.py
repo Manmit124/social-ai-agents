@@ -2,7 +2,7 @@
 
 import os
 from typing import Dict, List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 import httpx
 from dotenv import load_dotenv
 
@@ -300,4 +300,60 @@ class GitHubOAuthService:
         )
         
         return all_commits
+    
+    async def batch_fetch_commits(
+        self,
+        access_token: str,
+        username: str,
+        since_date: Optional[datetime] = None,
+        days: int = 30,
+        max_repos: int = 20
+    ) -> Dict:
+        """
+        Batch fetch commits from multiple repositories efficiently.
+        
+        Args:
+            access_token: Valid access token
+            username: GitHub username
+            since_date: Only commits after this date (if None, uses days parameter)
+            days: Number of days to fetch if since_date not provided
+            max_repos: Maximum number of repositories to check
+            
+        Returns:
+            dict: {
+                "commits": List of commits,
+                "total_commits": Total count,
+                "repositories_checked": Number of repos checked,
+                "last_commit_date": Most recent commit date
+            }
+        """
+        # Calculate since date if not provided
+        if since_date is None:
+            since_date = datetime.utcnow() - timedelta(days=days)
+        
+        # Fetch commits
+        commits = await self.get_user_commits(
+            access_token=access_token,
+            username=username,
+            since=since_date,
+            max_repos=max_repos
+        )
+        
+        # Get unique repositories
+        repos_checked = set()
+        for commit in commits:
+            if "repository" in commit:
+                repos_checked.add(commit["repository"]["name"])
+        
+        # Get most recent commit date
+        last_commit_date = None
+        if commits:
+            last_commit_date = commits[0]["commit"]["author"]["date"]
+        
+        return {
+            "commits": commits,
+            "total_commits": len(commits),
+            "repositories_checked": len(repos_checked),
+            "last_commit_date": last_commit_date
+        }
 
