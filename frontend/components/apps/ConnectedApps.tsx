@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Linkedin, MessageSquare, CheckCircle2, Clock, Sparkles } from "lucide-react";
+import { Linkedin, MessageSquare, CheckCircle2, Clock, Sparkles, Github } from "lucide-react";
 import { useConnections } from "@/hooks/api/useConnections";
 import { XIcon } from "@/components/icons/XIcon";
 
@@ -102,10 +102,13 @@ function AppCard({
 }
 
 export function ConnectedApps() {
-  const { connections, connectTwitter, disconnectAccount, isConnected, getConnection } = useConnections();
+  const { connections, connectTwitter, connectGitHub, disconnectAccount, isConnected, getConnection } = useConnections();
   
   const twitterConnection = getConnection("twitter");
   const isTwitterConnected = isConnected("twitter");
+  
+  const githubConnection = getConnection("github");
+  const isGitHubConnected = isConnected("github");
 
   const handleConnectTwitter = () => {
     connectTwitter.mutate();
@@ -114,6 +117,16 @@ export function ConnectedApps() {
   const handleDisconnectTwitter = () => {
     if (confirm("Are you sure you want to disconnect your X account?")) {
       disconnectAccount.mutate("twitter");
+    }
+  };
+
+  const handleConnectGitHub = () => {
+    connectGitHub.mutate();
+  };
+
+  const handleDisconnectGitHub = () => {
+    if (confirm("Are you sure you want to disconnect your GitHub account?")) {
+      disconnectAccount.mutate("github");
     }
   };
 
@@ -131,6 +144,18 @@ export function ConnectedApps() {
           onConnect={handleConnectTwitter}
           onDisconnect={handleDisconnectTwitter}
           isLoading={connectTwitter.isPending || disconnectAccount.isPending}
+        />
+
+        {/* GitHub */}
+        <AppCard
+          name="GitHub"
+          icon={<Github className="h-7 w-7 text-primary" />}
+          description="Connect your GitHub to generate personalized content based on your code activity"
+          isConnected={isGitHubConnected}
+          username={githubConnection?.platform_username}
+          onConnect={handleConnectGitHub}
+          onDisconnect={handleDisconnectGitHub}
+          isLoading={connectGitHub.isPending || disconnectAccount.isPending}
         />
 
         {/* LinkedIn */}

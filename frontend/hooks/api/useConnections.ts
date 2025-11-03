@@ -90,6 +90,40 @@ export function useConnections() {
     },
   });
 
+  // Connect GitHub account
+  const connectGitHub = useMutation({
+    mutationFn: async () => {
+      // Get session token
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error("Not authenticated");
+      }
+
+      const response = await fetch(`${API_URL}/api/auth/github/login`, {
+        headers: {
+          "Authorization": `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to initiate GitHub OAuth");
+      }
+
+      const data = await response.json();
+      
+      // Redirect to GitHub OAuth
+      if (data.auth_url) {
+        window.location.href = data.auth_url;
+      }
+      
+      return data;
+    },
+    onError: (error) => {
+      console.error("Error connecting GitHub:", error);
+    },
+  });
+
   // Disconnect account
   const disconnectAccount = useMutation({
     mutationFn: async (platform: string) => {
@@ -155,6 +189,7 @@ export function useConnections() {
     error,
     refetch,
     connectTwitter,
+    connectGitHub,
     disconnectAccount,
     isConnected,
     getConnection,
