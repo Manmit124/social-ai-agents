@@ -23,6 +23,7 @@ from auth.supabase_auth import get_current_user
 from agent.graph import run_agent
 from storage.tweet_storage import TweetStorage
 from services.social.twitter_service import TwitterOAuthService
+from services.social.github_service import GitHubOAuthService
 from services.supabase_service import supabase_service
 
 # Initialize FastAPI app
@@ -45,6 +46,7 @@ app.add_middleware(
 # Initialize services
 tweet_storage = TweetStorage()
 twitter_oauth = TwitterOAuthService()
+github_oauth = GitHubOAuthService()
 
 # Store OAuth states temporarily (in production, use Redis or database)
 oauth_states = {}
@@ -418,6 +420,101 @@ async def twitter_callback(
         raise
     except Exception as e:
         print(f"❌ Error in Twitter callback: {str(e)}")
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        return RedirectResponse(url=f"{frontend_url}/settings?error={str(e)}")
+
+
+@app.get("/api/auth/github/login")
+async def github_login(authorization: Optional[str] = Header(None)):
+    """
+    Initiate GitHub OAuth flow.
+    Requires user to be authenticated (JWT token in Authorization header).
+    """
+    try:
+        # Verify user is authenticated
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        token = authorization.split(" ")[1]
+        user_data = supabase_service.verify_jwt_token(token)
+        user_id = user_data.get("sub")
+        
+        # Generate state for CSRF protection
+        state = secrets.token_urlsafe(32)
+        
+        # Get authorization URL
+        auth_url, state = github_oauth.get_authorization_url(state)
+        
+        # Store state temporarily
+        oauth_states[state] = {
+            "user_id": user_id
+        }
+        
+        # Return auth URL for frontend to redirect
+        return {
+            "success": True,
+            "auth_url": auth_url
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error initiating GitHub OAuth: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/auth/github/callback")
+async def github_callback(
+    code: str = Query(...),
+    state: str = Query(...)
+):
+    """
+    Handle GitHub OAuth callback.
+    Exchange code for tokens and save to database.
+    """
+    try:
+        # Verify state
+        if state not in oauth_states:
+            raise HTTPException(status_code=400, detail="Invalid state parameter")
+        
+        oauth_data = oauth_states[state]
+        user_id = oauth_data["user_id"]
+        
+        # Exchange code for tokens
+        token_response = await github_oauth.exchange_code_for_token(code)
+        
+        # Get user info from GitHub
+        user_info = await github_oauth.get_user_info(token_response["access_token"])
+        
+        # Save to database
+        account_data = {
+            "user_id": user_id,
+            "platform": "github",
+            "platform_user_id": str(user_info["id"]),
+            "platform_username": user_info["login"],
+            "access_token": token_response["access_token"],
+            "refresh_token": None,  # GitHub doesn't use refresh tokens by default
+            "expires_at": None,  # GitHub tokens don't expire by default
+            "scope": token_response.get("scope", "").split(","),
+            "is_active": True
+        }
+        
+        success = supabase_service.save_connected_account(account_data)
+        
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to save connection")
+        
+        # Clean up state
+        del oauth_states[state]
+        
+        # Redirect to frontend success page
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        return RedirectResponse(url=f"{frontend_url}/settings?connected=github")
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error in GitHub callback: {str(e)}")
         frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
         return RedirectResponse(url=f"{frontend_url}/settings?error={str(e)}")
 
