@@ -39,10 +39,10 @@ export default function DataPage() {
       icon: Twitter,
       href: '/data/twitter',
       isConnected: isTwitterConnected,
-      isAvailable: false, // Coming soon
+      isAvailable: true, // Now available!
       color: 'text-primary',
       bgColor: 'bg-primary/10',
-      stats: [],
+      stats: isTwitterConnected ? ['Tweets analyzed', 'Style profile generated', 'Engagement tracked'] : [],
     },
   ];
 

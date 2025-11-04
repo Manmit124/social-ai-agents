@@ -1,122 +1,155 @@
 /**
  * Twitter Data Page
  * 
- * Coming Soon - Twitter integration
+ * View and analyze your Twitter data
  */
 
 'use client';
 
-import React from 'react';
-import Link from 'next/link';
+import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Twitter, ArrowLeft, Sparkles, BarChart3, TrendingUp, Users } from 'lucide-react';
+import { Download, RefreshCw } from 'lucide-react';
+import { TwitterStyleProfile } from '@/components/twitter';
+import { api } from '@/lib/api';
+import { useAuth } from '@/hooks/auth/useAuth';
 
 export default function TwitterDataPage() {
+  const { user } = useAuth();
+  const [fetching, setFetching] = useState(false);
+  const [fetchResult, setFetchResult] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleFetchTweets = async () => {
+    try {
+      setFetching(true);
+      setError(null);
+      setFetchResult(null);
+
+      const data = await api.post('/api/twitter/fetch-tweets?limit=20');
+      
+      if (data.success) {
+        setFetchResult(data);
+      } else {
+        setError('Failed to fetch tweets');
+      }
+    } catch (err: any) {
+      console.error('Error fetching tweets:', err);
+      
+      // Check for rate limit error
+      if (err.response?.status === 429) {
+        setError('⏱️ Twitter API rate limit reached. Please wait 15 minutes and try again. Twitter limits how many requests you can make per 15-minute window.');
+      } else {
+        setError(err.response?.data?.detail || 'Failed to fetch tweets. Make sure your Twitter account is connected.');
+      }
+    } finally {
+      setFetching(false);
+    }
+  };
+
   return (
-    <div className="flex h-full flex-col items-center justify-center p-8">
-      <div className="w-full max-w-3xl mx-auto space-y-8">
+    <div className="flex h-full flex-col p-8">
+      <div className="w-full max-w-7xl mx-auto space-y-8">
         
-        {/* Back Button */}
-        <Link href="/data">
-          <Button variant="ghost" className="gap-2">
-            <ArrowLeft className="w-4 h-4" />
-            Back to Data Sources
-          </Button>
-        </Link>
-
-        {/* Hero Card */}
-        <Card className="p-12 border-border text-center space-y-6">
-          <div className="flex justify-center">
-            <div className="relative">
-              <div className="absolute inset-0 bg-primary/20 rounded-full blur-3xl animate-pulse"></div>
-              <div className="relative bg-primary/10 p-6 rounded-full">
-                <Twitter className="w-16 h-16 text-primary" />
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <h1 className="text-4xl font-bold tracking-tight">
-              Twitter <span className="text-primary">Integration</span>
-            </h1>
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20">
-              <Sparkles className="w-4 h-4 text-primary" />
-              <span className="text-sm text-primary font-medium">Coming Soon</span>
-            </div>
-            <p className="text-lg text-muted-foreground max-w-xl mx-auto pt-2">
-              We're working on bringing Twitter data integration to help you analyze your tweets, 
-              engagement metrics, and generate even better content based on what resonates with your audience.
-            </p>
-          </div>
-        </Card>
-
-        {/* Planned Features */}
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-foreground text-center">
-            Planned Features
-          </h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card className="p-6 border-border space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="bg-primary/10 p-3 rounded-lg">
-                  <BarChart3 className="w-5 h-5 text-primary" />
-                </div>
-                <h3 className="font-semibold text-foreground">Tweet Analytics</h3>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Track your tweet performance, engagement rates, and identify what content works best
-              </p>
-            </Card>
-
-            <Card className="p-6 border-border space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="bg-primary/10 p-3 rounded-lg">
-                  <TrendingUp className="w-5 h-5 text-primary" />
-                </div>
-                <h3 className="font-semibold text-foreground">Trending Topics</h3>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Discover trending topics in your niche and get AI suggestions for timely content
-              </p>
-            </Card>
-
-            <Card className="p-6 border-border space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="bg-primary/10 p-3 rounded-lg">
-                  <Users className="w-5 h-5 text-primary" />
-                </div>
-                <h3 className="font-semibold text-foreground">Audience Insights</h3>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Understand your audience better with detailed analytics and engagement patterns
-              </p>
-            </Card>
-
-            <Card className="p-6 border-border space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="bg-primary/10 p-3 rounded-lg">
-                  <Sparkles className="w-5 h-5 text-primary" />
-                </div>
-                <h3 className="font-semibold text-foreground">Smart Suggestions</h3>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Get AI-powered content suggestions based on your past successful tweets
-              </p>
-            </Card>
-          </div>
+        {/* Header Section */}
+        <div className="space-y-2">
+          <h1 className="text-4xl font-bold tracking-tight">
+            Twitter <span className="text-primary">Integration</span>
+          </h1>
+          <p className="text-lg text-muted-foreground">
+            Analyze your tweets and writing style
+          </p>
         </div>
 
-        {/* Notify Section */}
-        <Card className="p-6 bg-muted/50 border-border text-center space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Want to be notified when Twitter integration is ready?
-          </p>
-          <p className="text-xs text-muted-foreground">
-            We'll send you an email as soon as this feature launches!
-          </p>
-        </Card>
+        {/* Fetch Button Section */}
+        <div className="flex justify-end">
+          <Button
+            onClick={handleFetchTweets}
+            disabled={fetching}
+            size="lg"
+            className="gap-2"
+          >
+            {fetching ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                Fetching Tweets...
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4" />
+                Fetch Tweets
+              </>
+            )}
+          </Button>
+        </div>
+
+        {/* Fetch Result Message */}
+        {fetchResult && (
+          <Card className="p-4 bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
+            <div className="flex items-start gap-3">
+              <div className="text-2xl">✅</div>
+              <div className="flex-1">
+                <p className="font-medium text-green-900 dark:text-green-100">
+                  {fetchResult.message}
+                </p>
+                <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+                  New tweets: {fetchResult.new_tweets} | Already stored: {fetchResult.existing_tweets}
+                </p>
+                {fetchResult.errors && fetchResult.errors.length > 0 && (
+                  <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                    Some errors occurred during fetch
+                  </p>
+                )}
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <Card className="p-4 bg-destructive/10 border-destructive/20">
+            <div className="flex items-start gap-3">
+              <div className="text-2xl">❌</div>
+              <div className="flex-1">
+                <p className="font-medium text-destructive">Error</p>
+                <p className="text-sm text-destructive/80 mt-1">{error}</p>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Twitter Style Profile Component */}
+        <TwitterStyleProfile />
+
+        {/* How to use Section - BOTTOM */}
+        <div className="p-6 bg-card border border-border rounded-lg">
+          <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+            <span className="text-primary">💡</span>
+            How to use
+          </h3>
+          <ul className="text-sm text-muted-foreground space-y-2">
+            <li className="flex items-start gap-2">
+              <span className="text-primary mt-0.5">•</span>
+              <span>Make sure your Twitter account is connected in Settings</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-primary mt-0.5">•</span>
+              <span>Click "Fetch Tweets" to import your last 20 tweets from Twitter</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-primary mt-0.5">•</span>
+              <span>Your style profile will be automatically generated and analyzed</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-primary mt-0.5">•</span>
+              <span>View your writing patterns, tone, and best performing content insights</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-primary mt-0.5">•</span>
+              <span>Use the "Regenerate" button to update your style profile anytime</span>
+            </li>
+          </ul>
+        </div>
       </div>
     </div>
   );

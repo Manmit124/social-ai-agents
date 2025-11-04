@@ -26,6 +26,8 @@ from services.social.twitter_service import TwitterOAuthService
 from services.social.github_service import GitHubOAuthService
 from services.supabase_service import supabase_service
 from services.github_data_service import GitHubDataService
+from services.twitter_data_service import twitter_data_service
+from services.twitter_analysis_service import twitter_analysis_service
 from services.context_service import ContextService
 
 # Initialize FastAPI app
@@ -426,6 +428,295 @@ async def twitter_callback(
         print(f"❌ Error in Twitter callback: {str(e)}")
         frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
         return RedirectResponse(url=f"{frontend_url}/settings?error={str(e)}")
+
+
+@app.post("/api/twitter/fetch-tweets")
+async def fetch_twitter_tweets(
+    authorization: Optional[str] = Header(None),
+    limit: int = Query(20, ge=1, le=100)
+):
+    """
+    Fetch user's tweets from Twitter and save to database.
+    
+    Args:
+        authorization: JWT token in Authorization header
+        limit: Number of tweets to fetch (default 20, max 100)
+        
+    Returns:
+        dict: Summary of fetched tweets
+    """
+    try:
+        # Verify user is authenticated
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        token = authorization.split(" ")[1]
+        user_data = supabase_service.verify_jwt_token(token)
+        user_id = user_data.get("sub")
+        
+        print(f"\n🐦 Fetching tweets for user {user_id}...")
+        
+        # Get user's Twitter connection
+        account = supabase_service.get_connected_account(user_id, "twitter")
+        if not account:
+            raise HTTPException(
+                status_code=404,
+                detail="Twitter account not connected. Please connect your Twitter account first."
+            )
+        
+        access_token = account.get("access_token")
+        if not access_token:
+            raise HTTPException(status_code=401, detail="No valid Twitter access token found")
+        
+        # Check if token is expired and refresh if needed
+        expires_at = account.get("expires_at")
+        if expires_at:
+            from datetime import datetime
+            if isinstance(expires_at, str):
+                expires_at = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+            
+            if twitter_oauth.is_token_expired(expires_at):
+                print(f"🔄 Token expired, refreshing for user {user_id}...")
+                try:
+                    token_response = await twitter_oauth.refresh_access_token(account["refresh_token"])
+                    access_token = token_response["access_token"]
+                    
+                    # Update tokens in database
+                    new_expires_at = twitter_oauth.calculate_token_expiry(token_response.get("expires_in", 7200))
+                    supabase_service.update_platform_tokens(
+                        user_id,
+                        "twitter",
+                        access_token,
+                        token_response.get("refresh_token", account["refresh_token"]),
+                        new_expires_at
+                    )
+                    print(f"✅ Token refreshed successfully")
+                except Exception as e:
+                    print(f"❌ Failed to refresh token: {str(e)}")
+                    raise HTTPException(
+                        status_code=401,
+                        detail="Your Twitter session has expired. Please reconnect your account."
+                    )
+        
+        # Fetch tweets from Twitter API
+        print(f"📥 Fetching {limit} tweets from Twitter API...")
+        try:
+            tweets_response = await twitter_oauth.batch_fetch_all_tweets(
+                access_token=access_token,
+                limit=limit
+            )
+        except Exception as fetch_error:
+            error_msg = str(fetch_error)
+            print(f"❌ Twitter API Error: {error_msg}")
+            
+            # Check for rate limit error
+            if "429" in error_msg or "Too Many Requests" in error_msg:
+                raise HTTPException(
+                    status_code=429,
+                    detail="Twitter API rate limit reached. Please wait 15 minutes and try again. Twitter allows limited requests per 15-minute window."
+                )
+            
+            # Re-raise other errors
+            raise
+        
+        tweets_data = tweets_response.get("data", [])
+        total_fetched = len(tweets_data)
+        
+        if not tweets_data:
+            return {
+                "success": True,
+                "message": "No tweets found",
+                "total_fetched": 0,
+                "new_tweets": 0,
+                "existing_tweets": 0
+            }
+        
+        print(f"✅ Fetched {total_fetched} tweets from Twitter")
+        
+        # Save tweets to database
+        print(f"💾 Saving tweets to database...")
+        save_result = await twitter_data_service.save_twitter_tweets(
+            user_id=user_id,
+            tweets_data=tweets_data
+        )
+        
+        # Get the most recent tweet ID
+        most_recent_tweet_id = tweets_data[0].get("id") if tweets_data else None
+        
+        # Update fetch log
+        await twitter_data_service.update_twitter_fetch_log(
+            user_id=user_id,
+            last_tweet_id=most_recent_tweet_id,
+            total_count=save_result["new_tweets"],
+            fetch_type="manual"
+        )
+        
+        print(f"✅ Saved {save_result['new_tweets']} new tweets, {save_result['existing_tweets']} already existed")
+        
+        # Generate style profile automatically
+        print(f"🎨 Generating style profile...")
+        try:
+            style_profile = await twitter_analysis_service.generate_style_profile(user_id)
+            print(f"✅ Style profile generated")
+        except Exception as e:
+            print(f"⚠️  Warning: Failed to generate style profile: {str(e)}")
+            # Don't fail the whole request if style profile generation fails
+        
+        return {
+            "success": True,
+            "message": f"Successfully fetched {total_fetched} tweets",
+            "total_fetched": total_fetched,
+            "new_tweets": save_result["new_tweets"],
+            "existing_tweets": save_result["existing_tweets"],
+            "errors": save_result.get("errors", [])
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error fetching tweets: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/twitter/tweets")
+async def get_user_tweets(
+    authorization: Optional[str] = Header(None),
+    limit: int = Query(100, ge=1, le=1000)
+):
+    """
+    Get user's stored tweets from database.
+    
+    Args:
+        authorization: JWT token in Authorization header
+        limit: Number of tweets to retrieve (default 100)
+        
+    Returns:
+        dict: List of stored tweets
+    """
+    try:
+        # Verify user is authenticated
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        token = authorization.split(" ")[1]
+        user_data = supabase_service.verify_jwt_token(token)
+        user_id = user_data.get("sub")
+        
+        # Get tweets from database
+        tweets = await twitter_data_service.get_user_tweets_from_db(user_id, limit)
+        
+        # Get stats
+        stats = await twitter_data_service.get_tweet_stats(user_id)
+        
+        # Get fetch log
+        fetch_log = await twitter_data_service.get_fetch_log(user_id)
+        
+        return {
+            "success": True,
+            "tweets": tweets,
+            "stats": stats,
+            "fetch_log": fetch_log
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error getting tweets: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/twitter/style-profile")
+async def get_twitter_style_profile(
+    authorization: Optional[str] = Header(None)
+):
+    """
+    Get user's Twitter style profile.
+    
+    Args:
+        authorization: JWT token in Authorization header
+        
+    Returns:
+        dict: Style profile with writing patterns and preferences
+    """
+    try:
+        # Verify user is authenticated
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        token = authorization.split(" ")[1]
+        user_data = supabase_service.verify_jwt_token(token)
+        user_id = user_data.get("sub")
+        
+        # Get style profile
+        profile = await twitter_analysis_service.get_style_profile(user_id)
+        
+        if not profile:
+            # Try to generate if doesn't exist
+            print(f"📊 No style profile found, generating...")
+            profile = await twitter_analysis_service.generate_style_profile(user_id)
+            
+            if profile.get("error"):
+                raise HTTPException(
+                    status_code=404,
+                    detail="No style profile available. Please fetch your tweets first."
+                )
+        
+        return {
+            "success": True,
+            "profile": profile
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error getting style profile: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/twitter/regenerate-style-profile")
+async def regenerate_style_profile(
+    authorization: Optional[str] = Header(None)
+):
+    """
+    Regenerate user's Twitter style profile.
+    
+    Args:
+        authorization: JWT token in Authorization header
+        
+    Returns:
+        dict: Newly generated style profile
+    """
+    try:
+        # Verify user is authenticated
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        token = authorization.split(" ")[1]
+        user_data = supabase_service.verify_jwt_token(token)
+        user_id = user_data.get("sub")
+        
+        print(f"\n🔄 Regenerating style profile for user {user_id}...")
+        
+        # Generate new profile
+        profile = await twitter_analysis_service.generate_style_profile(user_id)
+        
+        if profile.get("error"):
+            raise HTTPException(
+                status_code=400,
+                detail=profile.get("error", "Failed to generate style profile")
+            )
+        
+        return {
+            "success": True,
+            "message": "Style profile regenerated successfully",
+            "profile": profile
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error regenerating style profile: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/auth/github/login")
