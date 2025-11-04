@@ -1,4 +1,20 @@
+import { createClient } from '@/lib/supabase/client';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+// Helper to get auth token from Supabase session
+const getAuthToken = async (): Promise<string | null> => {
+  if (typeof window === 'undefined') return null;
+  
+  try {
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token || null;
+  } catch (error) {
+    console.error('Error getting auth token:', error);
+    return null;
+  }
+};
 
 export interface GenerateTweetResponse {
   success: boolean;
@@ -33,6 +49,54 @@ export interface HistoryResponse {
 }
 
 export const api = {
+  // Generic GET method
+  async get(endpoint: string, options?: RequestInit) {
+    const token = await getAuthToken();
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...(token && { 'Authorization': `Bearer ${token}` }),
+      ...options?.headers,
+    };
+
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      method: 'GET',
+      headers,
+      ...options,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+      throw { response: { status: response.status, data: error } };
+    }
+
+    return response.json();
+  },
+
+  // Generic POST method
+  async post(endpoint: string, data?: any, options?: RequestInit) {
+    const token = await getAuthToken();
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...(token && { 'Authorization': `Bearer ${token}` }),
+      ...options?.headers,
+    };
+
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      method: 'POST',
+      headers,
+      body: data ? JSON.stringify(data) : undefined,
+      ...options,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+      throw { response: { status: response.status, data: error } };
+    }
+
+    return response.json();
+  },
+
+  // Legacy methods for backward compatibility
   async generateTweet(prompt: string): Promise<GenerateTweetResponse> {
     const response = await fetch(`${API_URL}/api/generate`, {
       method: 'POST',

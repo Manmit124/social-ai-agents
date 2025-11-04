@@ -87,6 +87,12 @@ class SupabaseService:
             logger.error(f"Error fetching platform connection: {e}")
             return None
     
+    def get_connected_account(self, user_id: str, platform: str) -> Optional[Dict[str, Any]]:
+        """
+        Get specific platform connection for user (alias for get_platform_connection)
+        """
+        return self.get_platform_connection(user_id, platform)
+    
     def save_connected_account(self, account_data: Dict[str, Any]) -> bool:
         """
         Save or update connected account

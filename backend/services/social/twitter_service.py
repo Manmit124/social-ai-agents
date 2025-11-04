@@ -294,4 +294,156 @@ class TwitterOAuthService:
         
         # Add 5 minute buffer
         return now >= (expires_at - timedelta(minutes=5))
+    
+    async def get_user_tweets(
+        self, 
+        access_token: str, 
+        max_results: int = 20,
+        pagination_token: Optional[str] = None
+    ) -> Dict:
+        """
+        Get user's past tweets with metrics.
+        
+        Args:
+            access_token: Valid access token
+            max_results: Number of tweets to fetch (max 100, default 20)
+            pagination_token: Token for pagination
+            
+        Returns:
+            dict: Response with tweets data and pagination info
+        """
+        headers = {
+            "Authorization": f"Bearer {access_token}"
+        }
+        
+        # First, get the user's Twitter ID
+        async with httpx.AsyncClient() as client:
+            user_response = await client.get(
+                self.user_url,
+                headers=headers,
+                params={"user.fields": "id,username"}
+            )
+            
+            if user_response.status_code != 200:
+                raise Exception(f"Failed to get user info: {user_response.text}")
+            
+            user_data = user_response.json()
+            user_id = user_data["data"]["id"]
+            
+            # Now fetch tweets using the user ID
+            params = {
+                "max_results": min(max_results, 100),  # Twitter API max is 100
+                "tweet.fields": "created_at,public_metrics,entities",
+                "expansions": "author_id",
+                "user.fields": "id,name,username"
+            }
+            
+            if pagination_token:
+                params["pagination_token"] = pagination_token
+            
+            response = await client.get(
+                f"https://api.twitter.com/2/users/{user_id}/tweets",
+                headers=headers,
+                params=params
+            )
+            
+            if response.status_code != 200:
+                raise Exception(f"Failed to get user tweets: {response.text}")
+            
+            return response.json()
+    
+    async def get_tweet_metrics(self, access_token: str, tweet_ids: list[str]) -> Dict:
+        """
+        Get engagement metrics for specific tweets.
+        Note: Metrics are already included in get_user_tweets response.
+        This method is for getting metrics of specific tweets by ID.
+        
+        Args:
+            access_token: Valid access token
+            tweet_ids: List of tweet IDs
+            
+        Returns:
+            dict: Tweet metrics data
+        """
+        if not tweet_ids:
+            return {"data": []}
+        
+        headers = {
+            "Authorization": f"Bearer {access_token}"
+        }
+        
+        params = {
+            "ids": ",".join(tweet_ids),
+            "tweet.fields": "public_metrics,created_at"
+        }
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://api.twitter.com/2/tweets",
+                headers=headers,
+                params=params
+            )
+            
+            if response.status_code != 200:
+                raise Exception(f"Failed to get tweet metrics: {response.text}")
+            
+            return response.json()
+    
+    async def batch_fetch_all_tweets(
+        self, 
+        access_token: str, 
+        limit: int = 20
+    ) -> Dict:
+        """
+        Fetch multiple pages of tweets up to the specified limit.
+        
+        Args:
+            access_token: Valid access token
+            limit: Maximum number of tweets to fetch (default 20)
+            
+        Returns:
+            dict: All tweets data with combined results
+        """
+        all_tweets = []
+        all_users = []
+        pagination_token = None
+        total_fetched = 0
+        
+        while total_fetched < limit:
+            # Calculate how many to fetch in this request
+            remaining = limit - total_fetched
+            max_results = min(remaining, 100)  # Twitter API max per request
+            
+            # Fetch tweets
+            response = await self.get_user_tweets(
+                access_token=access_token,
+                max_results=max_results,
+                pagination_token=pagination_token
+            )
+            
+            # Extract data
+            tweets = response.get("data", [])
+            users = response.get("includes", {}).get("users", [])
+            meta = response.get("meta", {})
+            
+            if not tweets:
+                break  # No more tweets
+            
+            all_tweets.extend(tweets)
+            all_users.extend(users)
+            total_fetched += len(tweets)
+            
+            # Check if there's more data
+            pagination_token = meta.get("next_token")
+            if not pagination_token:
+                break  # No more pages
+        
+        return {
+            "data": all_tweets,
+            "includes": {"users": all_users},
+            "meta": {
+                "result_count": len(all_tweets),
+                "total_fetched": total_fetched
+            }
+        }
 
