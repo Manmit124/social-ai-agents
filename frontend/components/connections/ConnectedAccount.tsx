@@ -15,8 +15,28 @@ export function ConnectedAccount({ connection }: ConnectedAccountProps) {
 
   const handleDisconnect = () => {
     const platformName = connection.platform === "twitter" ? "X" : connection.platform;
-    if (confirm(`Are you sure you want to disconnect ${platformName}?`)) {
-      disconnectAccount.mutate(connection.platform);
+    
+    // Special warning for GitHub with data deletion info
+    if (connection.platform === "github") {
+      const confirmed = confirm(
+        `⚠️ Disconnect GitHub?\n\n` +
+        `This will permanently delete:\n` +
+        `• All stored commits\n` +
+        `• AI insights and analysis\n` +
+        `• Activity statistics\n` +
+        `• User context data\n\n` +
+        `You'll need to re-fetch and re-analyze data if you reconnect.\n\n` +
+        `Continue with disconnect?`
+      );
+      
+      if (confirmed) {
+        disconnectAccount.mutate(connection.platform);
+      }
+    } else {
+      // Standard confirmation for other platforms
+      if (confirm(`Are you sure you want to disconnect ${platformName}?`)) {
+        disconnectAccount.mutate(connection.platform);
+      }
     }
   };
 

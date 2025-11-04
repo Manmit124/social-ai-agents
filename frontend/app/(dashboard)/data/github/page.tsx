@@ -7,7 +7,7 @@
 'use client';
 
 import React from 'react';
-import { GitHubDataStatus, GitHubActivity } from '@/components/github';
+import { GitHubDataStatus, GitHubActivity, GitHubContext, GitHubInsights } from '@/components/github';
 import { useConnections } from '@/hooks/api/useConnections';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -126,7 +126,20 @@ export default function GitHubPage() {
           </p>
         </div>
 
-        {/* Main Content Grid */}
+        {/* Context and Insights Section - TOP */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left Column - Context & Stats */}
+          <div>
+            <GitHubContext />
+          </div>
+
+          {/* Right Column - AI Insights */}
+          <div>
+            <GitHubInsights />
+          </div>
+        </div>
+
+        {/* Data Section - BOTTOM */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Status */}
           <div className="lg:col-span-1">
@@ -152,7 +165,7 @@ export default function GitHubPage() {
             </li>
             <li className="flex items-start gap-2">
               <span className="text-primary mt-0.5">•</span>
-              <span>Data refreshes automatically when older than 24 hours</span>
+              <span>AI analyzes your activity to generate insights and content ideas</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-primary mt-0.5">•</span>
@@ -160,7 +173,7 @@ export default function GitHubPage() {
             </li>
             <li className="flex items-start gap-2">
               <span className="text-primary mt-0.5">•</span>
-              <span>This data will be used to generate personalized content</span>
+              <span>Use the "Refresh Insights" button to update AI analysis manually</span>
             </li>
           </ul>
         </div>

@@ -167,9 +167,14 @@ export function useConnections() {
         queryClient.setQueryData(["connections"], context.previousConnections);
       }
     },
-    onSettled: () => {
+    onSettled: (data, error, platform) => {
       // Refetch after mutation
       queryClient.invalidateQueries({ queryKey: ["connections"] });
+      
+      // If GitHub was disconnected, invalidate all GitHub-related queries
+      if (platform === "github") {
+        queryClient.invalidateQueries({ queryKey: ["github"] });
+      }
     },
   });
 
