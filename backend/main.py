@@ -26,6 +26,7 @@ from services.social.twitter_service import TwitterOAuthService
 from services.social.github_service import GitHubOAuthService
 from services.supabase_service import supabase_service
 from services.github_data_service import GitHubDataService
+from services.context_service import ContextService
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -49,6 +50,7 @@ tweet_storage = TweetStorage()
 twitter_oauth = TwitterOAuthService()
 github_oauth = GitHubOAuthService()
 github_data_service = GitHubDataService()
+context_service = ContextService()
 
 # Store OAuth states temporarily (in production, use Redis or database)
 oauth_states = {}
@@ -566,7 +568,7 @@ async def disconnect_account(
     authorization: Optional[str] = Header(None)
 ):
     """
-    Disconnect a social media account.
+    Disconnect a social media account and clean up all related data.
     """
     try:
         # Verify user is authenticated
@@ -576,6 +578,8 @@ async def disconnect_account(
         token = authorization.split(" ")[1]
         user_data = supabase_service.verify_jwt_token(token)
         user_id = user_data.get("sub")
+        
+        print(f"\n🔌 User {user_id} - Disconnecting {platform}...")
         
         # Get account to revoke token
         account = supabase_service.get_platform_connection(user_id, platform)
@@ -590,9 +594,41 @@ async def disconnect_account(
         if not success:
             raise HTTPException(status_code=500, detail="Failed to disconnect account")
         
+        # Clean up platform-specific data
+        if platform == "github":
+            print(f"🗑️  Cleaning up GitHub data...")
+            try:
+                # Delete all GitHub commits
+                result = supabase_service.client.table("github_activity").delete().eq(
+                    "user_id", user_id
+                ).execute()
+                commits_deleted = len(result.data) if result.data else 0
+                print(f"✅ Deleted {commits_deleted} commits")
+                
+                # Delete fetch logs
+                result = supabase_service.client.table("github_data_fetch_log").delete().eq(
+                    "user_id", user_id
+                ).execute()
+                logs_deleted = len(result.data) if result.data else 0
+                print(f"✅ Deleted {logs_deleted} fetch logs")
+                
+                # Delete user context
+                result = supabase_service.client.table("user_context").delete().eq(
+                    "user_id", user_id
+                ).execute()
+                context_deleted = len(result.data) if result.data else 0
+                print(f"✅ Deleted user context")
+                
+                print(f"✅ All GitHub data cleaned up successfully")
+            except Exception as e:
+                print(f"⚠️  Warning: Failed to clean up some GitHub data: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                # Don't fail the disconnect if cleanup fails
+        
         return {
             "success": True,
-            "message": f"{platform.capitalize()} account disconnected"
+            "message": f"{platform.capitalize()} account disconnected and data cleaned up"
         }
     
     except HTTPException:
@@ -692,6 +728,19 @@ async def fetch_github_data(
                 total_count=new_commits,
                 fetch_type=fetch_type
             )
+            
+            # Auto-update context only on first fetch (to save API costs)
+            if fetch_type == "initial":
+                print(f"🤖 First fetch detected - Generating initial context...")
+                try:
+                    # Check if context already exists
+                    context_exists = await context_service.context_exists(user_id)
+                    if not context_exists:
+                        await context_service.update_user_context(user_id, use_ai=True)
+                        print(f"✅ Initial context generated successfully")
+                except Exception as e:
+                    print(f"⚠️ Warning: Failed to generate context: {str(e)}")
+                    # Don't fail the whole request if context generation fails
             
             return {
                 "success": True,
@@ -863,6 +912,98 @@ async def check_refresh_needed(
         raise
     except Exception as e:
         print(f"❌ Error checking refresh status: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/github/context")
+async def get_github_context(authorization: Optional[str] = Header(None)):
+    """
+    Get user's GitHub context summary (cached).
+    
+    Args:
+        authorization: JWT token in Authorization header
+        
+    Returns:
+        User context with projects, tech stack, and activity summary
+    """
+    try:
+        # Verify user is authenticated
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        token = authorization.split(" ")[1]
+        user_data = supabase_service.verify_jwt_token(token)
+        user_id = user_data.get("sub")
+        
+        print(f"\n📊 User {user_id} - Getting GitHub context...")
+        
+        # Get cached context
+        context = await context_service.get_user_context(user_id)
+        
+        if not context:
+            return {
+                "success": True,
+                "data": None,
+                "message": "No context available. Please fetch GitHub data first."
+            }
+        
+        return {
+            "success": True,
+            "data": context
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error getting GitHub context: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/github/analyze")
+async def analyze_github_data(authorization: Optional[str] = Header(None)):
+    """
+    Analyze GitHub data and generate AI insights (manual refresh).
+    This endpoint costs API tokens as it calls Gemini.
+    
+    Args:
+        authorization: JWT token in Authorization header
+        
+    Returns:
+        Updated context with fresh AI insights
+    """
+    try:
+        # Verify user is authenticated
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        token = authorization.split(" ")[1]
+        user_data = supabase_service.verify_jwt_token(token)
+        user_id = user_data.get("sub")
+        
+        print(f"\n🤖 User {user_id} - Analyzing GitHub data with AI...")
+        
+        # Check if user has any GitHub data
+        github_account = supabase_service.get_platform_connection(user_id, "github")
+        
+        if not github_account:
+            raise HTTPException(
+                status_code=400,
+                detail="No GitHub account connected. Please connect your account first."
+            )
+        
+        # Refresh AI insights
+        context = await context_service.refresh_ai_insights(user_id)
+        
+        return {
+            "success": True,
+            "data": context,
+            "message": "AI insights generated successfully"
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error analyzing GitHub data: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

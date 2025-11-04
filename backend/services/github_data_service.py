@@ -177,7 +177,13 @@ class GitHubDataService:
         
         if result.data:
             date_str = result.data[0]["commit_date"]
-            return datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+            # Handle various ISO format variations
+            try:
+                return datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+            except ValueError:
+                # If parsing fails, try parsing with dateutil
+                from dateutil import parser
+                return parser.isoparse(date_str)
         
         return None
     
@@ -242,7 +248,13 @@ class GitHubDataService:
             }
         
         last_fetch_time_str = last_fetch_info["last_fetch_time"]
-        last_fetch_time = datetime.fromisoformat(last_fetch_time_str.replace("Z", "+00:00"))
+        # Handle various ISO format variations
+        try:
+            last_fetch_time = datetime.fromisoformat(last_fetch_time_str.replace("Z", "+00:00"))
+        except ValueError:
+            # If parsing fails, try parsing with dateutil
+            from dateutil import parser
+            last_fetch_time = parser.isoparse(last_fetch_time_str)
         
         # Calculate hours since last fetch
         now = datetime.utcnow().replace(tzinfo=last_fetch_time.tzinfo)

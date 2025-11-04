@@ -247,3 +247,103 @@ export function useFormatDate(dateString: string | null): string {
   });
 }
 
+/**
+ * Types for GitHub Context
+ */
+export interface GitHubContext {
+  id: string;
+  user_id: string;
+  current_projects: string[];
+  tech_stack: string[];
+  recent_activity_summary: string;
+  ai_insights: {
+    focus_areas: string[];
+    key_achievements: string[];
+    summary_for_social: string;
+    generated_at: string;
+  } | null;
+  activity_stats: {
+    commits_last_7_days: number;
+    commits_last_30_days: number;
+    average_commits_per_day: number;
+    most_active_day: string;
+    most_active_time: string;
+  };
+  last_github_fetch: string;
+  last_updated: string;
+}
+
+/**
+ * Hook to get GitHub context (cached)
+ */
+export function useGitHubContext() {
+  const supabase = createClient();
+
+  return useQuery<GitHubContext | null>({
+    queryKey: ['github', 'context'],
+    queryFn: async () => {
+      // Get session token
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      const response = await fetch(`${API_URL}/api/github/context`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Failed to fetch context' }));
+        throw new Error(error.detail || 'Failed to fetch GitHub context');
+      }
+
+      const result = await response.json();
+      return result.data;
+    },
+    // Refetch every 10 minutes
+    refetchInterval: 10 * 60 * 1000,
+  });
+}
+
+/**
+ * Hook to analyze GitHub data with AI (manual refresh)
+ */
+export function useAnalyzeGitHub() {
+  const queryClient = useQueryClient();
+  const supabase = createClient();
+
+  return useMutation<GitHubContext, Error>({
+    mutationFn: async () => {
+      // Get session token
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      const response = await fetch(`${API_URL}/api/github/analyze`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Failed to analyze data' }));
+        throw new Error(error.detail || 'Failed to analyze GitHub data');
+      }
+
+      const result = await response.json();
+      return result.data;
+    },
+    onSuccess: () => {
+      // Invalidate and refetch context
+      queryClient.invalidateQueries({ queryKey: ['github', 'context'] });
+    },
+  });
+}
+
