@@ -16,20 +16,26 @@ class GeminiService:
         self.client = genai.Client(api_key=self.api_key)
         self.model_name = "gemini-2.5-flash-lite"
     
-    async def generate_tweet(self, user_prompt: str, platform: str = "twitter") -> str:
+    async def generate_tweet(self, user_prompt: str, platform: str = "twitter", use_raw_prompt: bool = False) -> str:
         """
         Generate content based on user prompt and platform.
         
         Args:
-            user_prompt: The user's input prompt
+            user_prompt: The user's input prompt (may include RAG context)
             platform: Target platform (twitter, linkedin, reddit)
+            use_raw_prompt: If True, use prompt as-is (for RAG-enhanced prompts)
             
         Returns:
             Generated content (without hashtags)
         """
         try:
-            # Use platform-specific prompt
-            prompt = get_platform_prompt(platform, "generation", user_prompt=user_prompt)
+            # If using raw prompt (RAG-enhanced), use it directly
+            # Otherwise, wrap in platform-specific template
+            if use_raw_prompt:
+                prompt = user_prompt
+            else:
+                # Use platform-specific prompt template
+                prompt = get_platform_prompt(platform, "generation", user_prompt=user_prompt)
             
             # Run sync operation in thread pool
             loop = asyncio.get_event_loop()

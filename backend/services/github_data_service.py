@@ -5,6 +5,7 @@ from typing import Dict, List, Optional
 from datetime import datetime, timedelta
 from supabase import create_client, Client
 from dotenv import load_dotenv
+import json
 
 load_dotenv()
 
@@ -297,4 +298,311 @@ class GitHubDataService:
             "last_commit_date": last_commit_date.isoformat() if last_commit_date else None,
             "has_data": total_commits > 0
         }
+    
+    # ========================================================================
+    # EMBEDDING METHODS (Phase 3 - Semantic Search)
+    # ========================================================================
+    
+    async def save_commit_embedding(
+        self,
+        user_id: str,
+        commit_hash: str,
+        embedding: List[float]
+    ) -> bool:
+        """
+        Save embedding vector for a commit.
+        
+        Args:
+            user_id: User's UUID
+            commit_hash: Commit SHA hash
+            embedding: Embedding vector (768 dimensions)
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            # Convert embedding list to PostgreSQL vector format
+            # Supabase expects the vector as a string representation
+            embedding_str = json.dumps(embedding)
+            
+            # Update the commit with the embedding
+            result = self.supabase.table("github_activity").update({
+                "embedding": embedding_str
+            }).eq("user_id", user_id).eq("commit_hash", commit_hash).execute()
+            
+            return len(result.data) > 0
+            
+        except Exception as e:
+            print(f"❌ Error saving embedding for commit {commit_hash}: {str(e)}")
+            return False
+    
+    async def save_commit_embeddings_batch(
+        self,
+        user_id: str,
+        commit_embeddings: List[Dict[str, any]]
+    ) -> Dict[str, int]:
+        """
+        Save multiple commit embeddings efficiently.
+        
+        Args:
+            user_id: User's UUID
+            commit_embeddings: List of dicts with 'commit_hash' and 'embedding'
+            
+        Returns:
+            dict: {"success": count, "failed": count}
+        """
+        success = 0
+        failed = 0
+        
+        for item in commit_embeddings:
+            commit_hash = item.get("commit_hash")
+            embedding = item.get("embedding")
+            
+            if not commit_hash or not embedding:
+                failed += 1
+                continue
+            
+            result = await self.save_commit_embedding(user_id, commit_hash, embedding)
+            if result:
+                success += 1
+            else:
+                failed += 1
+        
+        return {
+            "success": success,
+            "failed": failed
+        }
+    
+    async def get_commits_without_embeddings(
+        self,
+        user_id: str,
+        limit: int = 100
+    ) -> List[Dict]:
+        """
+        Get commits that don't have embeddings yet.
+        
+        Args:
+            user_id: User's UUID
+            limit: Maximum number of commits to return
+            
+        Returns:
+            list: Commits without embeddings
+        """
+        try:
+            result = self.supabase.table("github_activity").select(
+                "id, commit_hash, commit_message, commit_date, repository_name, language"
+            ).eq("user_id", user_id).is_("embedding", "null").order(
+                "commit_date", desc=True
+            ).limit(limit).execute()
+            
+            return result.data
+            
+        except Exception as e:
+            print(f"❌ Error getting commits without embeddings: {str(e)}")
+            return []
+    
+    async def get_commits_with_embeddings(
+        self,
+        user_id: str,
+        limit: int = 100
+    ) -> List[Dict]:
+        """
+        Get commits that have embeddings.
+        
+        Args:
+            user_id: User's UUID
+            limit: Maximum number of commits to return
+            
+        Returns:
+            list: Commits with embeddings
+        """
+        try:
+            result = self.supabase.table("github_activity").select(
+                "id, commit_hash, commit_message, commit_date, repository_name, language, embedding"
+            ).eq("user_id", user_id).not_.is_("embedding", "null").order(
+                "commit_date", desc=True
+            ).limit(limit).execute()
+            
+            # Parse embeddings from JSON strings
+            for commit in result.data:
+                if commit.get("embedding"):
+                    try:
+                        commit["embedding"] = json.loads(commit["embedding"])
+                    except:
+                        commit["embedding"] = None
+            
+            return result.data
+            
+        except Exception as e:
+            print(f"❌ Error getting commits with embeddings: {str(e)}")
+            return []
+    
+    async def get_embedding_for_commit(
+        self,
+        commit_hash: str
+    ) -> Optional[List[float]]:
+        """
+        Get stored embedding for a specific commit.
+        
+        Args:
+            commit_hash: Commit SHA hash
+            
+        Returns:
+            list: Embedding vector or None if not found
+        """
+        try:
+            result = self.supabase.table("github_activity").select(
+                "embedding"
+            ).eq("commit_hash", commit_hash).execute()
+            
+            if result.data and result.data[0].get("embedding"):
+                embedding_str = result.data[0]["embedding"]
+                return json.loads(embedding_str)
+            
+            return None
+            
+        except Exception as e:
+            print(f"❌ Error getting embedding for commit {commit_hash}: {str(e)}")
+            return None
+    
+    async def search_similar_commits(
+        self,
+        user_id: str,
+        query_embedding: List[float],
+        limit: int = 10,
+        min_similarity: float = 0.5
+    ) -> List[Dict]:
+        """
+        Search for commits similar to the query using vector similarity.
+        
+        Uses cosine similarity (1 - cosine distance) for ranking.
+        
+        Args:
+            user_id: User's UUID
+            query_embedding: Query embedding vector (768 dimensions)
+            limit: Maximum number of results
+            min_similarity: Minimum similarity threshold (0-1)
+            
+        Returns:
+            list: Similar commits with similarity scores
+        """
+        try:
+            # Convert query embedding to PostgreSQL vector format
+            query_vector_str = json.dumps(query_embedding)
+            
+            # Use pgvector's cosine distance operator (<=>)
+            # Note: Supabase Python client might need RPC call for vector operations
+            # We'll use a stored procedure approach
+            
+            result = self.supabase.rpc(
+                'search_similar_commits',
+                {
+                    'query_user_id': user_id,
+                    'query_embedding': query_vector_str,
+                    'match_threshold': 1 - min_similarity,  # Convert similarity to distance
+                    'match_count': limit
+                }
+            ).execute()
+            
+            return result.data if result.data else []
+            
+        except Exception as e:
+            print(f"❌ Error searching similar commits: {str(e)}")
+            print(f"   Note: You may need to create the search_similar_commits RPC function in Supabase")
+            # Fallback: Get all commits with embeddings and calculate similarity in Python
+            return await self._search_similar_commits_fallback(user_id, query_embedding, limit, min_similarity)
+    
+    async def _search_similar_commits_fallback(
+        self,
+        user_id: str,
+        query_embedding: List[float],
+        limit: int,
+        min_similarity: float
+    ) -> List[Dict]:
+        """
+        Fallback method to search similar commits using Python-based similarity calculation.
+        
+        This is less efficient but works without database functions.
+        """
+        try:
+            # Get all commits with embeddings
+            commits = await self.get_commits_with_embeddings(user_id, limit=1000)
+            
+            if not commits:
+                return []
+            
+            # Calculate similarity for each commit
+            from sklearn.metrics.pairwise import cosine_similarity
+            import numpy as np
+            
+            query_vec = np.array(query_embedding).reshape(1, -1)
+            results = []
+            
+            for commit in commits:
+                if not commit.get("embedding"):
+                    continue
+                
+                commit_vec = np.array(commit["embedding"]).reshape(1, -1)
+                similarity = float(cosine_similarity(query_vec, commit_vec)[0][0])
+                
+                if similarity >= min_similarity:
+                    results.append({
+                        "id": commit["id"],
+                        "commit_hash": commit["commit_hash"],
+                        "commit_message": commit["commit_message"],
+                        "commit_date": commit["commit_date"],
+                        "repository_name": commit["repository_name"],
+                        "language": commit["language"],
+                        "similarity": round(similarity, 4)
+                    })
+            
+            # Sort by similarity (highest first)
+            results.sort(key=lambda x: x["similarity"], reverse=True)
+            
+            return results[:limit]
+            
+        except Exception as e:
+            print(f"❌ Error in fallback similarity search: {str(e)}")
+            return []
+    
+    async def get_embedding_stats(self, user_id: str) -> Dict[str, any]:
+        """
+        Get statistics about embeddings for a user.
+        
+        Args:
+            user_id: User's UUID
+            
+        Returns:
+            dict: Statistics about embeddings
+        """
+        try:
+            total_commits = await self.get_commit_count(user_id)
+            
+            # Count commits with embeddings
+            result = self.supabase.table("github_activity").select(
+                "id", count="exact"
+            ).eq("user_id", user_id).not_.is_("embedding", "null").execute()
+            
+            commits_with_embeddings = result.count if result.count else 0
+            commits_without_embeddings = total_commits - commits_with_embeddings
+            
+            percentage = (commits_with_embeddings / total_commits * 100) if total_commits > 0 else 0
+            
+            return {
+                "total_commits": total_commits,
+                "commits_with_embeddings": commits_with_embeddings,
+                "commits_without_embeddings": commits_without_embeddings,
+                "percentage_complete": round(percentage, 2),
+                "ready_for_search": commits_with_embeddings > 0
+            }
+            
+        except Exception as e:
+            print(f"❌ Error getting embedding stats: {str(e)}")
+            return {
+                "total_commits": 0,
+                "commits_with_embeddings": 0,
+                "commits_without_embeddings": 0,
+                "percentage_complete": 0,
+                "ready_for_search": False
+            }
 
