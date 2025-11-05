@@ -1,11 +1,13 @@
 from .state import AgentState
 from .tools import validate_tweet_length, combine_content_and_hashtags, get_char_count
 from services.gemini_service import GeminiService
+from services.rag_context_builder import get_rag_context_builder
 import os
 
 
-# Initialize Gemini service lazily
+# Initialize services lazily
 _gemini_service = None
+_rag_context_builder = None
 
 def get_gemini_service():
     global _gemini_service
@@ -13,16 +15,22 @@ def get_gemini_service():
         _gemini_service = GeminiService()
     return _gemini_service
 
+def get_rag_builder():
+    global _rag_context_builder
+    if _rag_context_builder is None:
+        _rag_context_builder = get_rag_context_builder()
+    return _rag_context_builder
+
 
 async def plan_node(state: AgentState) -> AgentState:
     """
-    Planning node - analyzes the user prompt.
+    Planning node - analyzes the user prompt and fetches RAG context.
     
     Args:
         state: Current agent state
         
     Returns:
-        Updated state
+        Updated state with RAG context
     """
     print("🤔 Planning: Analyzing user prompt...")
     
@@ -35,13 +43,34 @@ async def plan_node(state: AgentState) -> AgentState:
         state["is_valid"] = False
         return state
     
+    # Fetch RAG context if user_id is provided
+    user_id = state.get("user_id")
+    if user_id:
+        try:
+            print("🔍 Fetching relevant context from your work...")
+            rag_builder = get_rag_builder()
+            context_text = await rag_builder.get_context_for_tweet_generation(
+                user_id,
+                state["user_prompt"]
+            )
+            state["rag_context"] = context_text
+            if context_text:
+                print(f"✅ Found relevant context ({len(context_text)} chars)")
+            else:
+                print("ℹ️  No additional context found")
+        except Exception as e:
+            print(f"⚠️  Warning: Could not fetch RAG context: {str(e)}")
+            state["rag_context"] = ""
+    else:
+        state["rag_context"] = ""
+    
     state["is_valid"] = True
     return state
 
 
 async def generate_node(state: AgentState) -> AgentState:
     """
-    Generation node - calls Gemini to generate content.
+    Generation node - calls Gemini to generate content with RAG context.
     
     Args:
         state: Current agent state
@@ -55,9 +84,55 @@ async def generate_node(state: AgentState) -> AgentState:
     state["step"] = "generating"
     
     try:
-        # Generate content using Gemini with platform-specific prompts
+        # Build enhanced prompt with RAG context
+        user_prompt = state["user_prompt"]
+        rag_context = state.get("rag_context", "")
+        
         gemini_service = get_gemini_service()
-        tweet_content = await gemini_service.generate_tweet(state["user_prompt"], platform)
+        
+        # If we have RAG context, enhance the prompt and use raw mode
+        if rag_context:
+            # Build platform-specific requirements
+            if platform == "twitter":
+                requirements = """Twitter Requirements:
+- Maximum 250 characters (leave room for hashtags)
+- Casual, conversational tone
+- Use emojis sparingly
+- Make it shareable and authentic"""
+            elif platform == "linkedin":
+                requirements = """LinkedIn Requirements:
+- Professional yet conversational
+- Maximum 1300 characters
+- Focus on insights and value
+- Use paragraphs for readability"""
+            else:
+                requirements = """Requirements:
+- Authentic and conversational
+- Provide value
+- Be genuine"""
+            
+            enhanced_prompt = f"""{rag_context}
+
+USER REQUEST: {user_prompt}
+
+{requirements}
+
+IMPORTANT: Generate content based on the SPECIFIC commits shown above. You MUST:
+1. Reference actual commit messages (e.g., "upgraded to google-genai 1.0.0", "refactored GeminiService")
+2. Mention specific version numbers, technologies, or features from the commits
+3. Talk about actual problems solved or features built (not generic "building" or "working on")
+4. Use the exact repository names and technical details shown above
+5. Make it sound like you're sharing what you ACTUALLY did, not what you're "diving into"
+
+DO NOT use generic phrases like "been diving deep" or "building AI agents". Instead, say what you ACTUALLY built based on the commits above."""
+            
+            print(f"   📊 Using RAG context ({len(rag_context)} chars)")
+            tweet_content = await gemini_service.generate_tweet(enhanced_prompt, platform, use_raw_prompt=True)
+        else:
+            # No RAG context, use standard template
+            print(f"   ℹ️  No RAG context available, using standard template")
+            tweet_content = await gemini_service.generate_tweet(user_prompt, platform, use_raw_prompt=False)
+        
         state["tweet_content"] = tweet_content
         state["is_valid"] = True
         

@@ -51,13 +51,14 @@ def create_agent_graph():
     return app
 
 
-async def run_agent(user_prompt: str, platform: str = "twitter") -> AgentState:
+async def run_agent(user_prompt: str, platform: str = "twitter", user_id: str = None) -> AgentState:
     """
-    Run the tweet generation agent.
+    Run the tweet generation agent with RAG context.
     
     Args:
         user_prompt: User's input prompt
         platform: Target platform (twitter, linkedin, reddit)
+        user_id: User's UUID (for RAG context, optional)
         
     Returns:
         Final agent state with generated tweet
@@ -69,6 +70,8 @@ async def run_agent(user_prompt: str, platform: str = "twitter") -> AgentState:
     initial_state: AgentState = {
         "user_prompt": user_prompt,
         "platform": platform,
+        "user_id": user_id,
+        "rag_context": None,
         "tweet_content": "",
         "hashtags": [],
         "final_content": "",

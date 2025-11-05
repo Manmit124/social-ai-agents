@@ -30,6 +30,7 @@ from services.twitter_data_service import twitter_data_service
 from services.twitter_analysis_service import twitter_analysis_service
 from services.context_service import ContextService
 from services.embedding_service import get_embedding_service
+from services.embedding_job_service import get_embedding_job_service
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -101,8 +102,8 @@ async def generate_content(
         
         print(f"\n📝 User {user_id} - Received prompt for {request.platform}: {request.prompt}")
         
-        # Run the agent with platform parameter
-        final_state = await run_agent(request.prompt, request.platform)
+        # Run the agent with platform parameter and user_id for RAG context
+        final_state = await run_agent(request.prompt, request.platform, user_id)
         
         # Check if generation was successful
         if not final_state.get("is_valid"):
@@ -1034,6 +1035,21 @@ async def fetch_github_data(
                     print(f"⚠️ Warning: Failed to generate context: {str(e)}")
                     # Don't fail the whole request if context generation fails
             
+            # Auto-generate embeddings for new commits (Phase 3)
+            embedding_result = None
+            if new_commits > 0:
+                print(f"\n🔢 Auto-generating embeddings for {new_commits} new commits...")
+                try:
+                    embedding_job_service = get_embedding_job_service()
+                    embedding_result = await embedding_job_service.generate_embedding_for_new_commits(
+                        user_id,
+                        batch_size=50
+                    )
+                    print(f"✅ Generated {embedding_result['embeddings_generated']} embeddings")
+                except Exception as e:
+                    print(f"⚠️ Warning: Failed to generate embeddings: {str(e)}")
+                    # Don't fail the whole request if embedding generation fails
+            
             return {
                 "success": True,
                 "message": f"Fetched {new_commits} new commits from {result['repositories_checked']} repositories",
@@ -1041,7 +1057,8 @@ async def fetch_github_data(
                     "new_commits": new_commits,
                     "skipped_duplicates": skipped,
                     "repositories_checked": result['repositories_checked'],
-                    "fetch_type": fetch_type
+                    "fetch_type": fetch_type,
+                    "embeddings_generated": embedding_result["embeddings_generated"] if embedding_result else 0
                 }
             }
         else:
@@ -1522,6 +1539,340 @@ async def get_embedding_info(authorization: Optional[str] = Header(None)):
         raise
     except Exception as e:
         print(f"❌ Error getting embedding info: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# GITHUB EMBEDDINGS ENDPOINTS (Phase 3 Day 2 - Semantic Search)
+# ============================================================================
+
+@app.post("/api/github/embeddings/generate")
+async def generate_github_embeddings(
+    request: dict,
+    authorization: Optional[str] = Header(None)
+):
+    """
+    Generate embeddings for GitHub commits.
+    
+    Processes commits that don't have embeddings yet and stores them in the database.
+    Uses batch processing for efficiency.
+    
+    Request body:
+        {
+            "batch_size": 50 (optional, default: 50)
+        }
+    
+    Returns:
+        {
+            "success": true,
+            "embeddings_generated": 45,
+            "failed": 0,
+            "stats": {...}
+        }
+    """
+    try:
+        # Verify user is authenticated
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        token = authorization.split(" ")[1]
+        user_data = supabase_service.verify_jwt_token(token)
+        user_id = user_data.get("sub")
+        
+        batch_size = request.get("batch_size", 50)
+        
+        print(f"\n🔢 User {user_id} - Generating embeddings for GitHub commits...")
+        
+        # Get commits without embeddings
+        commits = await github_data_service.get_commits_without_embeddings(user_id, limit=batch_size)
+        
+        if not commits:
+            return {
+                "success": True,
+                "message": "All commits already have embeddings",
+                "embeddings_generated": 0,
+                "stats": await github_data_service.get_embedding_stats(user_id)
+            }
+        
+        print(f"   Found {len(commits)} commits without embeddings")
+        
+        # Extract commit messages for batch embedding
+        commit_messages = [commit["commit_message"] for commit in commits]
+        
+        # Generate embeddings in batch
+        embedding_service = get_embedding_service()
+        embeddings = embedding_service.generate_embeddings_batch(
+            commit_messages,
+            task_type="RETRIEVAL_DOCUMENT"
+        )
+        
+        print(f"   Generated {len(embeddings)} embeddings")
+        
+        # Prepare batch data for saving
+        commit_embeddings = []
+        for i, commit in enumerate(commits):
+            if i < len(embeddings):
+                commit_embeddings.append({
+                    "commit_hash": commit["commit_hash"],
+                    "embedding": embeddings[i]
+                })
+        
+        # Save embeddings to database
+        result = await github_data_service.save_commit_embeddings_batch(
+            user_id,
+            commit_embeddings
+        )
+        
+        print(f"   Saved {result['success']} embeddings, {result['failed']} failed")
+        
+        # Get updated stats
+        stats = await github_data_service.get_embedding_stats(user_id)
+        
+        return {
+            "success": True,
+            "embeddings_generated": result["success"],
+            "failed": result["failed"],
+            "processed_commits": len(commits),
+            "stats": stats
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error generating GitHub embeddings: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/github/embeddings/search")
+async def search_github_commits(
+    request: dict,
+    authorization: Optional[str] = Header(None)
+):
+    """
+    Search for similar GitHub commits using semantic search.
+    
+    Request body:
+        {
+            "query": "machine learning projects",
+            "limit": 10 (optional, default: 10),
+            "min_similarity": 0.5 (optional, default: 0.5)
+        }
+    
+    Returns:
+        {
+            "success": true,
+            "query": "machine learning projects",
+            "results": [
+                {
+                    "commit_hash": "abc123",
+                    "commit_message": "Added ML model",
+                    "similarity": 0.87,
+                    ...
+                }
+            ],
+            "count": 5
+        }
+    """
+    try:
+        # Verify user is authenticated
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        token = authorization.split(" ")[1]
+        user_data = supabase_service.verify_jwt_token(token)
+        user_id = user_data.get("sub")
+        
+        # Get query parameters
+        query = request.get("query")
+        if not query:
+            raise HTTPException(status_code=400, detail="Query is required")
+        
+        limit = request.get("limit", 10)
+        min_similarity = request.get("min_similarity", 0.5)
+        
+        print(f"\n🔍 User {user_id} - Searching commits for: '{query}'")
+        
+        # Generate query embedding
+        embedding_service = get_embedding_service()
+        query_embedding = embedding_service.generate_query_embedding(query)
+        
+        # Search for similar commits
+        results = await github_data_service.search_similar_commits(
+            user_id,
+            query_embedding,
+            limit=limit,
+            min_similarity=min_similarity
+        )
+        
+        print(f"   Found {len(results)} similar commits")
+        
+        return {
+            "success": True,
+            "query": query,
+            "results": results,
+            "count": len(results),
+            "min_similarity": min_similarity
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error searching GitHub commits: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/github/embeddings/stats")
+async def get_github_embedding_stats(authorization: Optional[str] = Header(None)):
+    """
+    Get statistics about GitHub commit embeddings.
+    
+    Returns:
+        {
+            "success": true,
+            "stats": {
+                "total_commits": 150,
+                "commits_with_embeddings": 100,
+                "commits_without_embeddings": 50,
+                "percentage_complete": 66.67,
+                "ready_for_search": true
+            }
+        }
+    """
+    try:
+        # Verify user is authenticated
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        token = authorization.split(" ")[1]
+        user_data = supabase_service.verify_jwt_token(token)
+        user_id = user_data.get("sub")
+        
+        # Get embedding stats
+        stats = await github_data_service.get_embedding_stats(user_id)
+        
+        return {
+            "success": True,
+            "stats": stats
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error getting embedding stats: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# EMBEDDING JOB ENDPOINTS (Phase 3 Day 3 - Batch Processing)
+# ============================================================================
+
+@app.post("/api/github/embeddings/generate-all")
+async def generate_all_embeddings(
+    request: dict,
+    authorization: Optional[str] = Header(None)
+):
+    """
+    Generate embeddings for ALL commits that don't have them (batch job).
+    
+    This processes all commits in batches of 50 for efficiency.
+    Use this for initial embedding generation or to catch up on missing embeddings.
+    
+    Request body:
+        {
+            "batch_size": 50 (optional),
+            "max_commits": 500 (optional, limit total commits to process)
+        }
+    
+    Returns:
+        {
+            "success": true,
+            "total_processed": 200,
+            "embeddings_generated": 195,
+            "failed": 5,
+            "batches_processed": 4,
+            "stats": {...}
+        }
+    """
+    try:
+        # Verify user is authenticated
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        token = authorization.split(" ")[1]
+        user_data = supabase_service.verify_jwt_token(token)
+        user_id = user_data.get("sub")
+        
+        batch_size = request.get("batch_size", 50)
+        max_commits = request.get("max_commits")
+        
+        print(f"\n🚀 User {user_id} - Starting batch embedding generation...")
+        
+        # Run the embedding job
+        embedding_job_service = get_embedding_job_service()
+        result = await embedding_job_service.generate_embeddings_for_user(
+            user_id,
+            batch_size=batch_size,
+            max_commits=max_commits
+        )
+        
+        return {
+            "success": True,
+            **result
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error in batch embedding generation: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/github/embeddings/status")
+async def get_embedding_job_status(authorization: Optional[str] = Header(None)):
+    """
+    Get detailed status of embedding generation progress.
+    
+    Returns:
+        {
+            "success": true,
+            "status": {
+                "total_commits": 200,
+                "commits_with_embeddings": 150,
+                "commits_needing_embeddings": 50,
+                "percentage_complete": 75.0,
+                "ready_for_search": true,
+                "estimated_batches_remaining": 1,
+                "estimated_api_calls": 1,
+                "status_message": "Almost done! 50 commits remaining"
+            }
+        }
+    """
+    try:
+        # Verify user is authenticated
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        token = authorization.split(" ")[1]
+        user_data = supabase_service.verify_jwt_token(token)
+        user_id = user_data.get("sub")
+        
+        # Get detailed status
+        embedding_job_service = get_embedding_job_service()
+        status = await embedding_job_service.get_embedding_status(user_id)
+        
+        return {
+            "success": True,
+            "status": status
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error getting embedding status: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
