@@ -29,6 +29,7 @@ from services.github_data_service import GitHubDataService
 from services.twitter_data_service import twitter_data_service
 from services.twitter_analysis_service import twitter_analysis_service
 from services.context_service import ContextService
+from services.embedding_service import get_embedding_service
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -1295,6 +1296,232 @@ async def analyze_github_data(authorization: Optional[str] = Header(None)):
         raise
     except Exception as e:
         print(f"❌ Error analyzing GitHub data: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# EMBEDDINGS ENDPOINTS (Phase 3 - Semantic Search)
+# ============================================================================
+
+@app.post("/api/embeddings/generate")
+async def generate_embedding(
+    request: dict,
+    authorization: Optional[str] = Header(None)
+):
+    """
+    Generate embedding for a single text.
+    
+    Test endpoint to verify embedding service works.
+    
+    Request body:
+        {
+            "text": "Your text here",
+            "task_type": "RETRIEVAL_DOCUMENT" (optional)
+        }
+    
+    Returns:
+        {
+            "success": true,
+            "embedding": [...],
+            "dimension": 768,
+            "text_length": 25
+        }
+    """
+    try:
+        # Verify user is authenticated
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        token = authorization.split(" ")[1]
+        user_data = supabase_service.verify_jwt_token(token)
+        user_id = user_data.get("sub")
+        
+        # Get text from request
+        text = request.get("text")
+        if not text:
+            raise HTTPException(status_code=400, detail="Text is required")
+        
+        task_type = request.get("task_type", "RETRIEVAL_DOCUMENT")
+        
+        print(f"\n🔢 User {user_id} - Generating embedding for text: {text[:50]}...")
+        
+        # Generate embedding
+        embedding_service = get_embedding_service()
+        embedding = embedding_service.generate_embedding(text, task_type=task_type)
+        
+        return {
+            "success": True,
+            "embedding": embedding,
+            "dimension": len(embedding),
+            "text_length": len(text),
+            "task_type": task_type,
+            "model": embedding_service.model
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error generating embedding: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/embeddings/batch")
+async def generate_embeddings_batch(
+    request: dict,
+    authorization: Optional[str] = Header(None)
+):
+    """
+    Generate embeddings for multiple texts in one API call (efficient).
+    
+    Request body:
+        {
+            "texts": ["Text 1", "Text 2", "Text 3"],
+            "task_type": "RETRIEVAL_DOCUMENT" (optional)
+        }
+    
+    Returns:
+        {
+            "success": true,
+            "embeddings": [[...], [...], [...]],
+            "count": 3,
+            "dimension": 768
+        }
+    """
+    try:
+        # Verify user is authenticated
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        token = authorization.split(" ")[1]
+        user_data = supabase_service.verify_jwt_token(token)
+        user_id = user_data.get("sub")
+        
+        # Get texts from request
+        texts = request.get("texts")
+        if not texts or not isinstance(texts, list):
+            raise HTTPException(status_code=400, detail="Texts array is required")
+        
+        task_type = request.get("task_type", "RETRIEVAL_DOCUMENT")
+        
+        print(f"\n🔢 User {user_id} - Generating {len(texts)} embeddings in batch...")
+        
+        # Generate embeddings
+        embedding_service = get_embedding_service()
+        embeddings = embedding_service.generate_embeddings_batch(texts, task_type=task_type)
+        
+        return {
+            "success": True,
+            "embeddings": embeddings,
+            "count": len(embeddings),
+            "dimension": len(embeddings[0]) if embeddings else 0,
+            "task_type": task_type,
+            "model": embedding_service.model
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error generating batch embeddings: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/embeddings/similarity")
+async def calculate_similarity(
+    request: dict,
+    authorization: Optional[str] = Header(None)
+):
+    """
+    Calculate similarity between two texts.
+    
+    Request body:
+        {
+            "text1": "First text",
+            "text2": "Second text"
+        }
+    
+    Returns:
+        {
+            "success": true,
+            "similarity": 0.87,
+            "text1": "First text",
+            "text2": "Second text"
+        }
+    """
+    try:
+        # Verify user is authenticated
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        token = authorization.split(" ")[1]
+        user_data = supabase_service.verify_jwt_token(token)
+        user_id = user_data.get("sub")
+        
+        # Get texts from request
+        text1 = request.get("text1")
+        text2 = request.get("text2")
+        
+        if not text1 or not text2:
+            raise HTTPException(status_code=400, detail="Both text1 and text2 are required")
+        
+        print(f"\n🔍 User {user_id} - Calculating similarity...")
+        
+        # Generate embeddings
+        embedding_service = get_embedding_service()
+        emb1 = embedding_service.generate_embedding(text1, task_type="SEMANTIC_SIMILARITY")
+        emb2 = embedding_service.generate_embedding(text2, task_type="SEMANTIC_SIMILARITY")
+        
+        # Calculate similarity
+        similarity = embedding_service.calculate_similarity(emb1, emb2)
+        
+        return {
+            "success": True,
+            "similarity": round(similarity, 4),
+            "text1": text1,
+            "text2": text2,
+            "interpretation": (
+                "Identical" if similarity > 0.95 else
+                "Very similar" if similarity > 0.8 else
+                "Somewhat similar" if similarity > 0.6 else
+                "Slightly similar" if similarity > 0.4 else
+                "Not similar"
+            )
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error calculating similarity: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/embeddings/info")
+async def get_embedding_info(authorization: Optional[str] = Header(None)):
+    """
+    Get information about the embedding model.
+    
+    Returns model details, dimensions, and capabilities.
+    """
+    try:
+        # Verify user is authenticated
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        token = authorization.split(" ")[1]
+        supabase_service.verify_jwt_token(token)
+        
+        # Get model info
+        embedding_service = get_embedding_service()
+        info = embedding_service.get_model_info()
+        
+        return {
+            "success": True,
+            "data": info
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error getting embedding info: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
