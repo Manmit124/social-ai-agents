@@ -32,7 +32,7 @@ class RAGContextBuilder:
         user_id: str,
         user_prompt: str,
         include_recent: bool = True,
-        max_commits: int = 5
+        max_commits: int = 10  # Increased from 5 to 10 for richer context
     ) -> Dict[str, any]:
         """
         Build complete context for AI content generation using RAG.
@@ -333,7 +333,7 @@ class RAGContextBuilder:
             user_id,
             user_prompt,
             include_recent=True,
-            max_commits=5
+            max_commits=10  # Increased from 5 to 10 for richer context
         )
         
         return context.get("formatted_context", "")
