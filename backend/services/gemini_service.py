@@ -14,7 +14,7 @@ class GeminiService:
         
         # Initialize the new Gemini client
         self.client = genai.Client(api_key=self.api_key)
-        self.model_name = "gemini-2.0-flash-exp"
+        self.model_name = "gemini-2.5-flash-lite"
     
     async def generate_tweet(self, user_prompt: str, platform: str = "twitter") -> str:
         """
