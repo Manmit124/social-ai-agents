@@ -123,8 +123,10 @@ IMPORTANT: Generate content based on the SPECIFIC commits shown above. You MUST:
 3. Talk about actual problems solved or features built (not generic "building" or "working on")
 4. Use the exact repository names and technical details shown above
 5. Make it sound like you're sharing what you ACTUALLY did, not what you're "diving into"
+6. MATCH THE USER'S WRITING STYLE shown above (length, tone, emoji usage)
 
-DO NOT use generic phrases like "been diving deep" or "building AI agents". Instead, say what you ACTUALLY built based on the commits above."""
+DO NOT use generic phrases like "been diving deep" or "building AI agents". Instead, say what you ACTUALLY built based on the commits above.
+Use the user's typical length, tone, and emoji style to make it authentic."""
             
             print(f"   📊 Using RAG context ({len(rag_context)} chars)")
             tweet_content = await gemini_service.generate_tweet(enhanced_prompt, platform, use_raw_prompt=True)

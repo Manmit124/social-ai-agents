@@ -1,4 +1,4 @@
-# Mataru.ai
+# Mataroo.com
 
 An AI-powered social media content generator that creates engaging posts using agentic AI workflows. Generate and publish content across multiple platforms with intelligent automation.
 

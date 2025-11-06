@@ -138,7 +138,7 @@ export function ConnectedApps() {
         <AppCard
           name="X"
           icon={<XIcon className="h-7 w-7" />}
-          description="Post to X and engage with your audience directly from Mataru.ai"
+          description="Post to X and engage with your audience directly from Mataroo.com"
           isConnected={isTwitterConnected}
           username={twitterConnection?.platform_username}
           onConnect={handleConnectTwitter}

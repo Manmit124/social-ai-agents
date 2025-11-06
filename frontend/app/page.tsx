@@ -46,7 +46,7 @@ export default function Home() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <span className="text-xl font-bold text-foreground">
-                Mataru
+                Mataroo
               </span>
             </div>
             <div className="flex items-center gap-4">

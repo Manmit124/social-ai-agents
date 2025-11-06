@@ -8,10 +8,10 @@ const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: {
-    default: "Mataru.ai - AI-Powered Social Media Content Generator",
-    template: "%s | Mataru.ai"
+    default: "Mataroo.com - AI-Powered Social Media Content Generator",
+    template: "%s | Mataroo.com"
   },
-  description: "Generate and post engaging content across X, LinkedIn, and Reddit using AI agents. Automate your social media with Mataru.ai - powered by LangGraph and Google Gemini.",
+  description: "Generate and post engaging content across X, LinkedIn, and Reddit using AI agents. Automate your social media with Mataroo.com - powered by LangGraph and Google Gemini.",
   keywords: [
     "AI social media generator",
     "automated content posting",
@@ -23,35 +23,35 @@ export const metadata: Metadata = {
     "OAuth social media",
     "multi-platform posting",
     "AI content creation",
-    "Mataru.ai"
+    "Mataroo.com"
   ],
-  authors: [{ name: "Mataru.ai Team" }],
-  creator: "Mataru.ai",
-  publisher: "Mataru.ai",
-  applicationName: "Mataru.ai",
+  authors: [{ name: "Mataroo.com Team" }],
+  creator: "Mataroo.com",
+  publisher: "Mataroo.com",
+  applicationName: "Mataroo.com",
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
   openGraph: {
     type: "website",
     locale: "en_US",
     url: "/",
-    title: "Mataru.ai - AI-Powered Social Media Content Generator",
+    title: "Mataroo.com - AI-Powered Social Media Content Generator",
     description: "Generate and post engaging content across social media platforms using AI agents. Automate your X, LinkedIn, and Reddit posts with intelligent AI.",
-    siteName: "Mataru.ai",
+    siteName: "Mataroo.com",
     images: [
       {
         url: "/favicon_io/android-chrome-512x512.png",
         width: 512,
         height: 512,
-        alt: "Mataru.ai Logo"
+        alt: "Mataroo.com Logo"
       }
     ]
   },
   twitter: {
     card: "summary_large_image",
-    title: "Mataru.ai - AI-Powered Social Media Content Generator",
+    title: "Mataroo.com - AI-Powered Social Media Content Generator",
     description: "Generate and post engaging content across social media platforms using AI agents. Automate your social media with intelligent AI.",
     images: ["/favicon_io/android-chrome-512x512.png"],
-    creator: "@mataruai"
+    creator: "@mataroo"
   },
   robots: {
     index: true,

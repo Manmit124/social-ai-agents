@@ -1,4 +1,4 @@
-# Mataru.ai - Robots.txt
+# Mataroo.com - Robots.txt
 
 User-agent: *
 Allow: /
@@ -8,7 +8,7 @@ Disallow: /settings/
 Disallow: /history/
 
 # Sitemap
-Sitemap: https://mataru.ai/sitemap.xml
+Sitemap: https://mataroo.com/sitemap.xml
 
 # Crawl-delay
 Crawl-delay: 1

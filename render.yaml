@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: mataru-ai-backend
+    name: mataroo-com-backend
     env: python
     region: oregon
     plan: free
