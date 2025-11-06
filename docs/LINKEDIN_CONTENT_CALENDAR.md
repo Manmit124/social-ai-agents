@@ -18,7 +18,7 @@
 
 **Post Content:**
 ```
-Starting a new phase in building @Mataru:
+Starting a new phase in building @Mataroo:
 
 The Personal Context Engine.
 
@@ -55,7 +55,7 @@ What's the hardest part of personalization you've faced?
   6. "Query Embedding" → "Supabase pgvector" (semantic search happens here)
   7. "Supabase pgvector" → "RAG Architecture" (orange) - Retrieval step
   8. "User Profile" → "RAG Architecture" - Style context
-  9. "RAG Architecture" → "Personalized Content @Mataru" (teal) - Generation step
+  9. "RAG Architecture" → "Personalized Content @Mataroo" (teal) - Generation step
   
   **Key Correction:** 
   - Remove direct arrows from Embeddings/Vector DB to Output
@@ -279,7 +279,7 @@ What feature are you building this week?
 - **Image 1:** Progress dashboard screenshot (if you have UI)
   - Show: "GitHub Connected ✅", "Commits Collected: 127", "Last Updated: 2 hours ago"
 - **OR:** Checklist with checkmarks: GitHub OAuth ✅, Data Collection ✅, etc.
-- **OR:** Mataru UI screenshot showing GitHub integration
+- **OR:** Mataroo UI screenshot showing GitHub integration
 - **Visual style:** Progress/proof of work
 
 **Hashtags:**
@@ -390,7 +390,7 @@ Distance: 0.95 (very far!)
 
 That's how AI understands meaning, not just words.
 
-Building this at @Mataru.
+Building this at @Mataroo.
 
 Want me to explain vector databases next?
 ```
@@ -510,7 +510,7 @@ For a learning project, "good enough" + learning > "best" + cost
 Sometimes the best solution isn't the paid one.
 Sometimes it's the one that teaches you.
 
-Building @Mataru taught me that.
+Building @Mataroo taught me that.
 
 What's a decision where "free + learning" beat "paid + easy" for you?
 ```
@@ -543,7 +543,7 @@ What's a decision where "free + learning" beat "paid + easy" for you?
 
 **Post Content:**
 ```
-How RAG (Retrieval Augmented Generation) works in @Mataru:
+How RAG (Retrieval Augmented Generation) works in @Mataroo:
 
 Traditional AI:
 User: "Write about my work"
@@ -581,7 +581,7 @@ It's better context.
 
 That's RAG in action.
 
-Building this live at @Mataru.
+Building this live at @Mataroo.
 
 Have you implemented RAG? What's your approach?
 ```
@@ -651,7 +651,7 @@ What's your week 4 milestone?
   - Left: "Generic AI" - Generic tweet
   - Right: "RAG AI" - Personalized tweet with actual work
   - Show the difference visually
-- **OR:** Mataru UI screenshot showing:
+- **OR:** Mataroo UI screenshot showing:
   - GitHub connected
   - Generated personalized post
   - Style matching
@@ -757,7 +757,7 @@ This Thanksgiving week, I'm grateful for:
    Documentation, tutorials, Stack Overflow
    The internet is an amazing teacher
 
-Building @Mataru taught me:
+Building @Mataroo taught me:
 Gratitude isn't just for what you have.
 It's for the community that helps you build.
 
@@ -797,7 +797,7 @@ What are you grateful for in your building journey?
    - Very easy to use
 
 4. **Screenshots**
-   - Actual Mataru UI (best option when available)
+   - Actual Mataroo UI (best option when available)
    - Terminal output
    - Code snippets (use Carbon.now.sh for beautiful code)
 
@@ -809,7 +809,7 @@ What are you grateful for in your building journey?
    - Style: Clean, technical, professional
 
 2. **Progress Screenshots** (Nov 5, Nov 12, Nov 19, Nov 26)
-   - Use: Actual Mataru UI when ready
+   - Use: Actual Mataroo UI when ready
    - Show: Features working, progress made
    - Style: Real, authentic, proof of work
 
@@ -832,7 +832,7 @@ What are you grateful for in your building journey?
 - **Size:** 1200 x 627 pixels (LinkedIn optimal)
 - **Format:** PNG or JPG
 - **Text:** Keep minimal, readable on mobile
-- **Branding:** Add Mataru logo subtly (if you have one)
+- **Branding:** Add Mataroo logo subtly (if you have one)
 
 ---
 

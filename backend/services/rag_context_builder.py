@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 from .embedding_service import get_embedding_service
 from .github_data_service import GitHubDataService
 from .context_service import ContextService
+from .twitter_analysis_service import twitter_analysis_service
 
 
 class RAGContextBuilder:
@@ -61,6 +62,7 @@ class RAGContextBuilder:
             "relevant_commits": [],
             "recent_commits": [],
             "user_context": {},
+            "twitter_style": {},  # NEW: Twitter writing style
             "prompt_analysis": {},
             "formatted_context": ""
         }
@@ -98,6 +100,13 @@ class RAGContextBuilder:
                     "key_achievements": user_context.get("ai_insights", {}).get("key_achievements", [])
                 }
                 print(f"   ✅ Loaded user context")
+            
+            # 4. Get Twitter writing style (NEW!)
+            print("   ✍️  Getting Twitter writing style...")
+            twitter_style = await self._get_twitter_style(user_id)
+            if twitter_style:
+                context["twitter_style"] = twitter_style
+                print(f"   ✅ Loaded writing style")
             
             # 4. Analyze prompt
             context["prompt_analysis"] = self._analyze_prompt(user_prompt)
@@ -158,6 +167,40 @@ class RAGContextBuilder:
         except Exception as e:
             print(f"      ⚠️ Error getting relevant commits: {str(e)}")
             return []
+    
+    async def _get_twitter_style(self, user_id: str) -> Optional[Dict]:
+        """
+        Get user's Twitter writing style from database.
+        
+        Args:
+            user_id: User's UUID
+            
+        Returns:
+            dict: Twitter style profile or None
+        """
+        try:
+            # Get style profile from user_context
+            user_context = await self.context_service.get_user_context(user_id)
+            if not user_context:
+                return None
+            
+            # Extract style information
+            style_data = user_context.get("twitter_style_profile", {})
+            if not style_data:
+                return None
+            
+            return {
+                "avg_length": style_data.get("avg_length", 0),
+                "tone": style_data.get("tone", "casual"),
+                "emoji_usage": style_data.get("emoji_usage", {}),
+                "common_emojis": style_data.get("common_emojis", []),
+                "hashtag_count": style_data.get("avg_hashtags", 0),
+                "top_topics": style_data.get("top_topics", [])
+            }
+        
+        except Exception as e:
+            print(f"      ⚠️ Error getting Twitter style: {str(e)}")
+            return None
     
     async def _get_recent_commits(
         self,
@@ -261,12 +304,27 @@ class RAGContextBuilder:
         if context["relevant_commits"]:
             lines.append("YOUR ACTUAL WORK (Use these specific details):")
             lines.append("")
-            for i, commit in enumerate(context["relevant_commits"][:3], 1):
+            for i, commit in enumerate(context["relevant_commits"][:5], 1):  # Show 5 instead of 3
                 similarity = commit.get("similarity", 0)
                 repo = commit['repository_name']
                 msg = commit['commit_message']
-                lines.append(f"Commit {i} ({similarity*100:.0f}% relevant):")
+                lang = commit.get('language', 'Unknown')
+                date = commit.get('commit_date', '')
+                
+                # Format date nicely
+                if date:
+                    try:
+                        from datetime import datetime
+                        date_obj = datetime.fromisoformat(date.replace("Z", "+00:00"))
+                        date_str = date_obj.strftime("%b %d")
+                    except:
+                        date_str = "Recently"
+                else:
+                    date_str = "Recently"
+                
+                lines.append(f"Commit {i} ({similarity*100:.0f}% relevant, {date_str}):")
                 lines.append(f"  Repository: {repo}")
+                lines.append(f"  Language: {lang}")
                 lines.append(f"  What you did: {msg}")
                 lines.append("")
         
@@ -292,23 +350,55 @@ class RAGContextBuilder:
         # Add user context
         user_ctx = context.get("user_context", {})
         if user_ctx:
+            lines.append("YOUR PROFILE:")
+            
             # Projects
             if user_ctx.get("projects"):
                 projects = user_ctx["projects"][:3]
-                lines.append(f"💼 ACTIVE PROJECTS: {', '.join(projects)}")
+                lines.append(f"  💼 Active Projects: {', '.join(projects)}")
             
             # Tech stack
             if user_ctx.get("tech_stack"):
                 tech = user_ctx["tech_stack"][:5]
-                lines.append(f"🛠️  TECH STACK: {', '.join(tech)}")
+                lines.append(f"  🛠️  Tech Stack: {', '.join(tech)}")
             
             # Focus areas
             if user_ctx.get("focus_areas"):
                 focus = user_ctx["focus_areas"][:2]
-                lines.append(f"🎯 FOCUS AREAS: {', '.join(focus)}")
+                lines.append(f"  🎯 Focus Areas: {', '.join(focus)}")
             
-            if any([user_ctx.get("projects"), user_ctx.get("tech_stack"), user_ctx.get("focus_areas")]):
+            # Key achievements (NEW!)
+            if user_ctx.get("key_achievements"):
+                achievements = user_ctx["key_achievements"][:2]
+                lines.append(f"  🏆 Recent Wins: {', '.join(achievements)}")
+            
+            if any([user_ctx.get("projects"), user_ctx.get("tech_stack"), user_ctx.get("focus_areas"), user_ctx.get("key_achievements")]):
                 lines.append("")
+        
+        # Add Twitter writing style (NEW!)
+        twitter_style = context.get("twitter_style", {})
+        if twitter_style:
+            lines.append("YOUR WRITING STYLE:")
+            
+            # Average length
+            if twitter_style.get("avg_length"):
+                lines.append(f"  📏 Typical Length: ~{twitter_style['avg_length']} characters")
+            
+            # Tone
+            if twitter_style.get("tone"):
+                lines.append(f"  💬 Tone: {twitter_style['tone'].title()}")
+            
+            # Emoji usage
+            if twitter_style.get("common_emojis"):
+                emojis = ' '.join(twitter_style['common_emojis'][:5])
+                lines.append(f"  😊 Favorite Emojis: {emojis}")
+            
+            # Topics
+            if twitter_style.get("top_topics"):
+                topics = ', '.join(twitter_style['top_topics'][:3])
+                lines.append(f"  📌 Common Topics: {topics}")
+            
+            lines.append("")
         
         return "\n".join(lines)
     

@@ -34,7 +34,7 @@ from services.embedding_job_service import get_embedding_job_service
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="Mataru.ai API",
+    title="Mataroo.com API",
     description="AI-powered social media content generator with agentic workflows",
     version="1.0.0"
 )
@@ -64,7 +64,7 @@ oauth_states = {}
 async def root():
     """Root endpoint."""
     return {
-        "message": "Mataru.ai API",
+        "message": "Mataroo.com API",
         "version": "1.0.0",
         "status": "running"
     }

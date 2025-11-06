@@ -2,7 +2,7 @@ export function JsonLd() {
   const schema = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    "name": "Mataru.ai",
+    "name": "Mataroo.com",
     "applicationCategory": "BusinessApplication",
     "operatingSystem": "Web",
     "offers": {

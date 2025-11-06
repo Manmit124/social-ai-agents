@@ -1,9 +1,9 @@
-# Twitter Post for Mataru.ai Launch
+# Twitter Post for Mataroo.com Launch
 
 ## 🎯 Recommended Post (280 characters)
 
 ```
-🚀 Introducing Mataru.ai!
+🚀 Introducing Mataroo.com!
 
 From Diwali weekend idea → Full OAuth-integrated platform in 6 days
 
@@ -23,7 +23,7 @@ Built entirely in public! 🔥
 
 ### Tweet 1/5
 ```
-🚀 Launching Mataru.ai - my AI-powered social media content generator!
+🚀 Launching Mataroo.com - my AI-powered social media content generator!
 
 6 days ago: simple tweet generator
 Today: full OAuth platform with multi-platform support
@@ -43,7 +43,7 @@ The power of building in public! 💪
 
 ### Tweet 3/5
 ```
-What Mataru.ai does:
+What Mataroo.com does:
 
 → Connect your Twitter via OAuth 2.0
 → Type a prompt (e.g., "AI in education")
@@ -73,7 +73,7 @@ Cost so far: $0 💰
 
 ### Tweet 5/5
 ```
-What's next for Mataru.ai?
+What's next for Mataroo.com?
 
 🔜 LinkedIn integration
 🔜 Reddit support
@@ -101,11 +101,11 @@ Who wants to try it? Drop a 👋
 
 ### Screenshot 3: Posted Tweet
 - Show the actual tweet on Twitter
-- Highlight it was posted via Mataru.ai
+- Highlight it was posted via Mataroo.com
 - Include engagement metrics if any
 
 ### Video Idea (30 seconds)
-1. Open Mataru.ai dashboard (2s)
+1. Open Mataroo.com dashboard (2s)
 2. Type prompt: "AI agents won't replace devs — they'll replace the lazy ones" (3s)
 3. Click "Generate Content" (1s)
 4. Show AI generating (2s)
@@ -113,7 +113,7 @@ Who wants to try it? Drop a 👋
 6. Click "Post to Twitter" (1s)
 7. Show success message (2s)
 8. Switch to Twitter and show the live post (3s)
-9. End with Mataru.ai logo (2s)
+9. End with Mataroo.com logo (2s)
 
 ---
 
@@ -121,7 +121,7 @@ Who wants to try it? Drop a 👋
 
 ### Short & Punchy (Perfect for quick update)
 ```
-🎯 Built Mataru.ai in 6 days!
+🎯 Built Mataroo.com in 6 days!
 
 AI content generator → Twitter OAuth → Live posting
 
@@ -134,7 +134,7 @@ From idea to working product. Building in public rocks! 🚀
 
 ### Developer-Focused
 ```
-🔧 Just shipped Mataru.ai - OAuth 2.0 + AI agents in one app
+🔧 Just shipped Mataroo.com - OAuth 2.0 + AI agents in one app
 
 Implemented:
 ✅ Twitter OAuth 2.0 with PKCE
@@ -153,7 +153,7 @@ Biggest lesson: Start building, learn while shipping!
 
 Today: Full OAuth platform with AI agents, multi-platform support, and post tracking
 
-Mataru.ai is live! 🚀
+Mataroo.com is live! 🚀
 
 The best way to learn? Build something real.
 
