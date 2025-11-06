@@ -8,8 +8,8 @@ const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: {
-    default: "Mataroo.com - AI-Powered Social Media Content Generator",
-    template: "%s | Mataroo.com"
+    default: "Mataroo - AI-Powered Social Media Content Generator",
+    template: "%s | Mataroo"
   },
   description: "Generate and post engaging content across X, LinkedIn, and Reddit using AI agents. Automate your social media with Mataroo.com - powered by LangGraph and Google Gemini.",
   keywords: [
