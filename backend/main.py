@@ -31,6 +31,16 @@ from services.twitter_analysis_service import twitter_analysis_service
 from services.context_service import ContextService
 from services.embedding_service import get_embedding_service
 from services.embedding_job_service import get_embedding_job_service
+from services.subscription_service import get_subscription_service
+from services.razorpay_service import get_razorpay_service
+
+# Validate Razorpay configuration at startup
+try:
+    razorpay_service = get_razorpay_service()
+except ValueError as e:
+    print(f"❌ Razorpay configuration error: {e}")
+    print("Please set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in your .env file")
+    raise
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -158,6 +168,16 @@ async def post_content(
         
         print(f"\n🚀 User {user_id} - Posting to {request.platform}: {request.content[:50]}...")
         
+        # Check subscription limit before posting
+        subscription_service = get_subscription_service()
+        can_post, message = subscription_service.can_user_post(user_id)
+        
+        if not can_post:
+            raise HTTPException(
+                status_code=403,
+                detail=message
+            )
+        
         # Get user's connected account for this platform
         account = supabase_service.get_platform_connection(user_id, request.platform)
         
@@ -255,6 +275,9 @@ async def post_content(
         }
         
         post_id = supabase_service.save_post(post_data)
+        
+        # Increment post count after successful post
+        subscription_service.increment_post_count(user_id)
         
         print(f"✅ Posted successfully to {request.platform}: {result.get('url')}")
         
@@ -1873,6 +1896,163 @@ async def get_embedding_job_status(authorization: Optional[str] = Header(None)):
         raise
     except Exception as e:
         print(f"❌ Error getting embedding status: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# SUBSCRIPTION & PAYMENT ENDPOINTS
+# ============================================================================
+
+@app.get("/api/subscription/status")
+async def get_subscription_status(authorization: Optional[str] = Header(None)):
+    """
+    Get user's subscription status.
+    
+    Returns:
+        Subscription details: plan_type, posts_used, posts_limit, remaining
+    """
+    try:
+        # Verify user is authenticated
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        token = authorization.split(" ")[1]
+        user_data = supabase_service.verify_jwt_token(token)
+        user_id = user_data.get("sub")
+        
+        subscription_service = get_subscription_service()
+        status = subscription_service.get_subscription_status(user_id)
+        
+        return {
+            "success": True,
+            "subscription": status
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error getting subscription status: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/payments/create-order")
+async def create_payment_order(authorization: Optional[str] = Header(None)):
+    """
+    Create Razorpay order for Pro subscription.
+    
+    Returns:
+        Order details: order_id, amount, key_id for frontend checkout
+    """
+    try:
+        # Verify user is authenticated
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        token = authorization.split(" ")[1]
+        user_data = supabase_service.verify_jwt_token(token)
+        user_id = user_data.get("sub")
+        
+        print(f"\n💳 User {user_id} - Creating payment order for Pro subscription...")
+        
+        # Create Razorpay order (₹5 = 500 paise)
+        razorpay_service = get_razorpay_service()
+        order = razorpay_service.create_order(amount=5, currency="INR", user_id=user_id)
+        
+        print(f"✅ Created Razorpay order: {order.get('id')}")
+        
+        return {
+            "success": True,
+            "order": {
+                "id": order.get("id"),
+                "amount": order.get("amount"),  # Amount in paise
+                "currency": order.get("currency"),
+                "key_id": razorpay_service.key_id  # For frontend checkout
+            }
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error creating payment order: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/payments/verify")
+async def verify_payment(
+    request: dict,
+    authorization: Optional[str] = Header(None)
+):
+    """
+    Verify Razorpay payment and activate Pro subscription.
+    
+    Request body:
+        {
+            "razorpay_order_id": "...",
+            "razorpay_payment_id": "...",
+            "razorpay_signature": "..."
+        }
+    
+    Returns:
+        Success message and updated subscription
+    """
+    try:
+        # Verify user is authenticated
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        
+        token = authorization.split(" ")[1]
+        user_data = supabase_service.verify_jwt_token(token)
+        user_id = user_data.get("sub")
+        
+        # Get payment details from request
+        razorpay_order_id = request.get("razorpay_order_id")
+        razorpay_payment_id = request.get("razorpay_payment_id")
+        razorpay_signature = request.get("razorpay_signature")
+        
+        if not all([razorpay_order_id, razorpay_payment_id, razorpay_signature]):
+            raise HTTPException(status_code=400, detail="Missing payment details")
+        
+        print(f"\n🔐 User {user_id} - Verifying payment...")
+        
+        # Verify payment signature
+        razorpay_service = get_razorpay_service()
+        is_verified = razorpay_service.verify_payment(
+            razorpay_order_id,
+            razorpay_payment_id,
+            razorpay_signature
+        )
+        
+        if not is_verified:
+            raise HTTPException(status_code=400, detail="Payment verification failed")
+        
+        print(f"✅ Payment verified successfully")
+        
+        # Upgrade user to Pro
+        subscription_service = get_subscription_service()
+        success = subscription_service.upgrade_to_pro(
+            user_id,
+            razorpay_payment_id,
+            razorpay_order_id
+        )
+        
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to upgrade subscription")
+        
+        print(f"✅ User {user_id} upgraded to Pro")
+        
+        # Get updated subscription status
+        status = subscription_service.get_subscription_status(user_id)
+        
+        return {
+            "success": True,
+            "message": "Payment verified and Pro subscription activated!",
+            "subscription": status
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error verifying payment: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

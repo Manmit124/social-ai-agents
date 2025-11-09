@@ -50,6 +50,9 @@ export default function Home() {
               </span>
             </div>
             <div className="flex items-center gap-4">
+              <Link href="/pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                Pricing
+              </Link>
               <Link href="/login">
                 <Button variant="ghost">
                   Sign In
@@ -117,7 +120,70 @@ export default function Home() {
         </div>
       </section>
 
-      
+      {/* Footer */}
+      <footer className="relative z-10 mt-0">
+        {/* Black Section - Footer Content */}
+        <div className="bg-black py-8">
+          <div className="container mx-auto px-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+              <div>
+                <h3 className="font-semibold mb-4 text-white">Mataroo</h3>
+                <p className="text-sm text-gray-400">
+                  AI-powered social media content generation and posting platform.
+                </p>
+              </div>
+              <div>
+                <h3 className="font-semibold mb-4 text-white">Legal</h3>
+                <ul className="space-y-2 text-sm">
+                  <li>
+                    <Link href="/privacy" className="text-gray-400 hover:text-white transition-colors">
+                      Privacy Policy
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/terms" className="text-gray-400 hover:text-white transition-colors">
+                      Terms & Conditions
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/refund" className="text-gray-400 hover:text-white transition-colors">
+                      Refund Policy
+                    </Link>
+                  </li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="font-semibold mb-4 text-white">Support</h3>
+                <ul className="space-y-2 text-sm">
+                  <li>
+                    <Link href="/contact" className="text-gray-400 hover:text-white transition-colors">
+                      Contact Us
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/pricing" className="text-gray-400 hover:text-white transition-colors">
+                      Pricing
+                    </Link>
+                  </li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="font-semibold mb-4 text-white">Contact</h3>
+                <ul className="space-y-2 text-sm">
+                  <li>
+                    <a href="mailto:manmittiwade124@gmail.com" className="text-gray-400 hover:text-white transition-colors">
+                      manmittiwade124@gmail.com
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </div>
+            <div className="border-t border-gray-800 pt-8 text-center text-sm text-gray-400">
+              <p>&copy; {new Date().getFullYear()} Mataroo. All rights reserved.</p>
+            </div>
+          </div>
+        </div>
+      </footer>
 
       <style jsx global>{`
         @keyframes fade-in {

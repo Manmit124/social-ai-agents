@@ -14,7 +14,8 @@ import {
   Twitter,
   Sparkles,
   LayoutGrid,
-  Database
+  Database,
+  CreditCard
 } from "lucide-react";
 
 const navigation = [
@@ -22,6 +23,7 @@ const navigation = [
   { name: "Apps", href: "/apps", icon: LayoutGrid },
   { name: "Data Sources", href: "/data", icon: Database },
   { name: "History", href: "/history", icon: History },
+  { name: "Credits", href: "/credits", icon: CreditCard },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
