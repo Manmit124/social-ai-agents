@@ -151,8 +151,11 @@ export default function PricingPage() {
                 <div className="flex items-center justify-between mb-4">
                   <CardTitle className="text-3xl font-bold">Free</CardTitle>
                   <div className="text-right">
+                    <div className="text-sm text-muted-foreground mb-1">in USD</div>
                     <div className="text-4xl font-bold">$0</div>
-                    <div className="text-sm text-muted-foreground">forever</div>
+                    <div className="text-sm text-muted-foreground mb-1 mt-2">in INR</div>
+                    <div className="text-2xl font-semibold">₹0</div>
+                    <div className="text-sm text-muted-foreground mt-1">forever</div>
                   </div>
                 </div>
               </CardHeader>
@@ -208,8 +211,10 @@ export default function PricingPage() {
                 <div className="flex items-center justify-between mb-4">
                   <CardTitle className="text-3xl font-bold">Pro</CardTitle>
                   <div className="text-right">
-                    <div className="text-4xl font-bold text-primary">$5</div>
-                    <div className="text-sm text-muted-foreground">/month</div>
+                    <div className="text-sm text-muted-foreground mb-1">in USD</div>
+                    <div className="text-4xl font-bold text-primary">$5<span className="text-xl">/month</span></div>
+                    <div className="text-sm text-muted-foreground mb-1 mt-2">in INR</div>
+                    <div className="text-2xl font-semibold text-primary">₹440<span className="text-base">/month</span></div>
                   </div>
                 </div>
               </CardHeader>
@@ -248,7 +253,7 @@ export default function PricingPage() {
                   onClick={handleStartPro}
                   disabled={isLoading}
                 >
-                  {isLoading ? "Loading..." : user ? "Upgrade to Pro" : "Start Pro - $5/month"}
+                  {isLoading ? "Loading..." : user ? "Upgrade to Pro" : "Start Pro - $5/month (₹440/month)"}
                 </Button>
                 <p className="text-xs text-center text-muted-foreground">
                   Cancel anytime. No credit card required for Free.

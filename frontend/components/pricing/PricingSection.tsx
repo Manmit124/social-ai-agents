@@ -122,7 +122,12 @@ export function PricingSection() {
             <CardHeader>
               <div className="flex items-center justify-between mb-2">
                 <CardTitle className="text-2xl">Free</CardTitle>
-                <span className="text-3xl font-bold">$0</span>
+                <div className="text-right">
+                  <div className="text-xs text-muted-foreground mb-1">in USD</div>
+                  <div className="text-3xl font-bold">$0</div>
+                  <div className="text-xs text-muted-foreground mb-1 mt-2">in INR</div>
+                  <div className="text-xl font-semibold">₹0</div>
+                </div>
               </div>
               <CardDescription className="text-base">
                 Perfect for trying Mataroo
@@ -178,9 +183,11 @@ export function PricingSection() {
             <CardHeader>
               <div className="flex items-center justify-between mb-2">
                 <CardTitle className="text-2xl">Pro</CardTitle>
-                <div>
-                  <span className="text-3xl font-bold">$5</span>
-                  <span className="text-muted-foreground">/month</span>
+                <div className="text-right">
+                  <div className="text-xs text-muted-foreground mb-1">in USD</div>
+                  <div className="text-3xl font-bold text-primary">$5<span className="text-lg">/month</span></div>
+                  <div className="text-xs text-muted-foreground mb-1 mt-2">in INR</div>
+                  <div className="text-xl font-semibold text-primary">₹440<span className="text-base">/month</span></div>
                 </div>
               </div>
               <CardDescription className="text-base">
